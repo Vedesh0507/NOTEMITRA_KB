@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Search, Filter, SlidersHorizontal, Download, Eye, ThumbsUp, Calendar, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { notesAPI } from '@/lib/api';
+import { CURRICULUM, BRANCHES, SEMESTERS } from '@/lib/curriculum';
 
 interface Note {
   id: number | string;
@@ -39,10 +40,21 @@ export default function BrowsePage() {
   const [selectedModule, setSelectedModule] = useState('');
   const [sortBy, setSortBy] = useState('newest');
 
-  // Common options
-  const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical'];
-  const semesters = ['1', '2', '3', '4', '5', '6', '7', '8'];
-  const branches = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'IT', 'Chemical'];
+  // Get subjects based on selected branch and semester
+  const getSubjects = () => {
+    if (selectedBranch && selectedSemester) {
+      return CURRICULUM[selectedBranch]?.[selectedSemester] || [];
+    }
+    return [];
+  };
+
+  const subjects = getSubjects();
+
+  // Reset subject when branch or semester changes
+  useEffect(() => {
+    setSelectedSubject('');
+  }, [selectedBranch, selectedSemester]);
+
   const sortOptions = [
     { value: 'newest', label: 'Newest First' },
     { value: 'oldest', label: 'Oldest First' },
@@ -163,15 +175,25 @@ export default function BrowsePage() {
             <div className="mt-4 pt-4 border-t border-gray-200">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
                   <select
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">All Subjects</option>
-                    {subjects.map(subject => (
-                      <option key={subject} value={subject}>{subject}</option>
+                    <option value="">All Branches</option>
+                    {BRANCHES.map(branch => (
+                      <option key={branch} value={branch}>
+                        {branch === 'Computer Science & Engineering' ? 'CSE - Computer Science & Engineering' :
+                         branch === 'Artificial Intelligence & Machine Learning' ? 'AI & ML - Artificial Intelligence & Machine Learning' :
+                         branch === 'Artificial Intelligence & Data Science' ? 'AI & DS - Artificial Intelligence & Data Science' :
+                         branch === 'Information Technology' ? 'IT - Information Technology' :
+                         branch === 'Electronics & Communication Engineering' ? 'ECE - Electronics & Communication Engineering' :
+                         branch === 'Electrical & Electronics Engineering' ? 'EEE - Electrical & Electronics Engineering' :
+                         branch === 'Civil Engineering' ? 'CIVIL - Civil Engineering' :
+                         branch === 'Mechanical Engineering' ? 'MECH - Mechanical Engineering' :
+                         branch}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -184,22 +206,27 @@ export default function BrowsePage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">All Semesters</option>
-                    {semesters.map(sem => (
+                    {SEMESTERS.map(sem => (
                       <option key={sem} value={sem}>Semester {sem}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                   <select
-                    value={selectedBranch}
-                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    value={selectedSubject}
+                    onChange={(e) => setSelectedSubject(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={!selectedBranch || !selectedSemester}
                   >
-                    <option value="">All Branches</option>
-                    {branches.map(branch => (
-                      <option key={branch} value={branch}>{branch}</option>
+                    <option value="">
+                      {!selectedBranch || !selectedSemester 
+                        ? 'Select branch & semester first' 
+                        : 'All Subjects'}
+                    </option>
+                    {subjects.map(subject => (
+                      <option key={subject} value={subject}>{subject}</option>
                     ))}
                   </select>
                 </div>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
 import api from '@/lib/api';
+import { CURRICULUM, BRANCHES, SEMESTERS } from '@/lib/curriculum';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -31,9 +32,20 @@ export default function UploadPage() {
     tags: ''
   });
 
-  const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'Biology', 'English'];
-  const semesters = ['1', '2', '3', '4', '5', '6', '7', '8'];
-  const branches = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'IT', 'Chemical', 'Biotechnology'];
+  // Get subjects based on selected branch and semester
+  const getSubjects = () => {
+    if (formData.branch && formData.semester) {
+      return CURRICULUM[formData.branch]?.[formData.semester] || [];
+    }
+    return [];
+  };
+
+  const subjects = getSubjects();
+
+  // Reset subject when branch or semester changes
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, subject: '' }));
+  }, [formData.branch, formData.semester]);
 
   // Check if uploads are enabled (MongoDB connected)
   useEffect(() => {
@@ -447,24 +459,32 @@ export default function UploadPage() {
               )}
             </div>
 
-            {/* Subject, Semester, Branch Row */}
+            {/* Branch, Semester, Subject Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                  Subject *
+                <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-2">
+                  Branch *
                 </label>
                 <select
-                  id="subject"
-                  name="subject"
-                  value={formData.subject}
+                  id="branch"
+                  name="branch"
+                  value={formData.branch}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
-                  <option value="">Select Subject</option>
-                  {subjects.map((subject) => (
-                    <option key={subject} value={subject}>
-                      {subject}
+                  <option value="">Select Branch</option>
+                  {BRANCHES.map((branch) => (
+                    <option key={branch} value={branch}>
+                      {branch === 'Computer Science & Engineering' ? 'CSE - Computer Science & Engineering' :
+                       branch === 'Artificial Intelligence & Machine Learning' ? 'AI & ML - Artificial Intelligence & Machine Learning' :
+                       branch === 'Artificial Intelligence & Data Science' ? 'AI & DS - Artificial Intelligence & Data Science' :
+                       branch === 'Information Technology' ? 'IT - Information Technology' :
+                       branch === 'Electronics & Communication Engineering' ? 'ECE - Electronics & Communication Engineering' :
+                       branch === 'Electrical & Electronics Engineering' ? 'EEE - Electrical & Electronics Engineering' :
+                       branch === 'Civil Engineering' ? 'CIVIL - Civil Engineering' :
+                       branch === 'Mechanical Engineering' ? 'MECH - Mechanical Engineering' :
+                       branch}
                     </option>
                   ))}
                 </select>
@@ -483,7 +503,7 @@ export default function UploadPage() {
                   required
                 >
                   <option value="">Select Semester</option>
-                  {semesters.map((sem) => (
+                  {SEMESTERS.map((sem) => (
                     <option key={sem} value={sem}>
                       Semester {sem}
                     </option>
@@ -492,21 +512,26 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label htmlFor="branch" className="block text-sm font-medium text-gray-700 mb-2">
-                  Branch *
+                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                  Subject *
                 </label>
                 <select
-                  id="branch"
-                  name="branch"
-                  value={formData.branch}
+                  id="subject"
+                  name="subject"
+                  value={formData.subject}
                   onChange={handleInputChange}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
+                  disabled={!formData.branch || !formData.semester}
                 >
-                  <option value="">Select Branch</option>
-                  {branches.map((branch) => (
-                    <option key={branch} value={branch}>
-                      {branch}
+                  <option value="">
+                    {!formData.branch || !formData.semester 
+                      ? 'Select branch & semester first' 
+                      : 'Select Subject'}
+                  </option>
+                  {subjects.map((subject) => (
+                    <option key={subject} value={subject}>
+                      {subject}
                     </option>
                   ))}
                 </select>
