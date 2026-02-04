@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
+import api from '@/lib/api';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -17,6 +18,8 @@ export default function UploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadsEnabled, setUploadsEnabled] = useState<boolean | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -31,6 +34,23 @@ export default function UploadPage() {
   const subjects = ['Mathematics', 'Physics', 'Chemistry', 'Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'Biology', 'English'];
   const semesters = ['1', '2', '3', '4', '5', '6', '7', '8'];
   const branches = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'IT', 'Chemical', 'Biotechnology'];
+
+  // Check if uploads are enabled (MongoDB connected)
+  useEffect(() => {
+    const checkUploadStatus = async () => {
+      try {
+        const response = await api.get('/health');
+        setUploadsEnabled(response.data.uploadsEnabled === true);
+      } catch (err) {
+        console.error('Failed to check upload status:', err);
+        setUploadsEnabled(false);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+    
+    checkUploadStatus();
+  }, []);
 
   // Redirect if not logged in - use useEffect for client-side navigation
   useEffect(() => {
@@ -250,7 +270,17 @@ export default function UploadPage() {
         console.error('❌ Server response status:', err.response.status);
         console.error('❌ Server response data:', err.response.data);
       }
-      setError(err.response?.data?.message || 'Failed to upload note. Please try again.');
+      
+      // Provide more helpful error messages
+      const serverMessage = err.response?.data?.message;
+      const errorCode = err.response?.data?.error;
+      
+      if (errorCode === 'DATABASE_NOT_CONNECTED' || serverMessage?.includes('MongoDB')) {
+        setError('File upload is temporarily unavailable. The database is not connected. Please try again later or contact support.');
+        setUploadsEnabled(false);
+      } else {
+        setError(serverMessage || 'Failed to upload note. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -264,6 +294,20 @@ export default function UploadPage() {
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Upload Notes</h1>
           <p className="text-gray-600">Share your study materials with fellow students</p>
         </div>
+
+        {/* Uploads Disabled Warning */}
+        {uploadsEnabled === false && !checkingStatus && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
+            <Database className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-amber-900">Uploads Temporarily Unavailable</h3>
+              <p className="text-amber-700 text-sm">
+                The file storage system is currently unavailable. This usually means the database is being updated or maintained.
+                Please try again in a few minutes.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Success Message */}
         {success && (
@@ -514,11 +558,25 @@ export default function UploadPage() {
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={uploading || !selectedFile}>
+            <Button 
+              type="submit" 
+              disabled={uploading || !selectedFile || uploadsEnabled === false}
+              title={uploadsEnabled === false ? 'Uploads are temporarily unavailable' : undefined}
+            >
               {uploading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Uploading...
+                </>
+              ) : checkingStatus ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Checking...
+                </>
+              ) : uploadsEnabled === false ? (
+                <>
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Uploads Unavailable
                 </>
               ) : (
                 <>

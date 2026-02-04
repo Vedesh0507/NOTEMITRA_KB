@@ -164,21 +164,37 @@ const configureGoogleAuth = () => {
 
 // Try to connect to MongoDB
 async function connectMongoDB() {
+  console.log('🔄 Attempting MongoDB connection...');
+  
   try {
     const mongoURI = process.env.MONGODB_URI;
     
-    if (!mongoURI || mongoURI.includes('username:password')) {
+    // Log connection attempt (hide sensitive data)
+    if (mongoURI) {
+      const sanitizedURI = mongoURI.replace(/:([^:@]+)@/, ':****@');
+      console.log('📡 MongoDB URI configured:', sanitizedURI.substring(0, 50) + '...');
+    } else {
+      console.log('❌ MONGODB_URI environment variable is not set');
+    }
+    
+    if (!mongoURI || mongoURI.includes('username:password') || mongoURI === '') {
       console.log('⚠️  MongoDB not configured - using in-memory storage');
-      console.log('   To enable MongoDB, update MONGODB_URI in .env file');
-      console.log('   See SETUP_GUIDE.md for instructions');
+      console.log('   To enable MongoDB:');
+      console.log('   1. Set MONGODB_URI environment variable in Render dashboard');
+      console.log('   2. Use your MongoDB Atlas connection string');
+      console.log('   3. Redeploy the service');
       return false;
     }
 
+    console.log('🔌 Connecting to MongoDB...');
+    
     await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
     });
 
     console.log('✅ MongoDB connected successfully');
+    console.log('📊 Database name:', mongoose.connection.db.databaseName);
 
     // Initialize GridFS
     const conn = mongoose.connection;
@@ -204,6 +220,20 @@ async function connectMongoDB() {
     });
 
     console.log('✅ GridFS initialized for file storage');
+    console.log('✅ File uploads ENABLED');
+
+    // Handle MongoDB connection events
+    mongoose.connection.on('disconnected', () => {
+      console.log('⚠️  MongoDB disconnected');
+    });
+    
+    mongoose.connection.on('reconnected', () => {
+      console.log('✅ MongoDB reconnected');
+    });
+    
+    mongoose.connection.on('error', (err) => {
+      console.error('❌ MongoDB connection error:', err.message);
+    });
 
     // Define Schemas
     const userSchema = new mongoose.Schema({
@@ -262,9 +292,20 @@ async function connectMongoDB() {
 
     return true;
   } catch (error) {
-    console.log('⚠️  MongoDB connection failed - using in-memory storage');
-    console.log('   Error:', error.message);
-    console.log('   See SETUP_GUIDE.md for MongoDB Atlas setup instructions');
+    console.error('❌ MongoDB connection failed');
+    console.error('   Error type:', error.name);
+    console.error('   Error message:', error.message);
+    if (error.code) {
+      console.error('   Error code:', error.code);
+    }
+    console.log('');
+    console.log('📋 TROUBLESHOOTING:');
+    console.log('   1. Check MONGODB_URI is set in Render Environment Variables');
+    console.log('   2. Ensure MongoDB Atlas IP whitelist includes 0.0.0.0/0');
+    console.log('   3. Verify username/password are correct');
+    console.log('   4. Check MongoDB Atlas cluster is running');
+    console.log('');
+    console.log('⚠️  Using in-memory storage - uploads will be DISABLED');
     return false;
   }
 }
@@ -272,18 +313,25 @@ async function connectMongoDB() {
 // Health check
 app.get('/api/health', (req, res) => {
   try {
+    // Check actual MongoDB connection state
+    const mongoConnected = mongoose.connection.readyState === 1;
+    const uploadsEnabled = useMongoDB && mongoConnected && gridfsBucket !== undefined;
+    
     const healthData = {
       status: 'ok',
       message: 'NoteMitra API is running',
       database: useMongoDB ? 'MongoDB' : 'In-Memory',
+      mongoConnected: mongoConnected,
+      uploadsEnabled: uploadsEnabled,
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
       version: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
       services: {
         api: 'operational',
-        database: useMongoDB ? 'connected' : 'in-memory',
-        fileStorage: useMongoDB ? 'GridFS' : 'disabled'
+        database: mongoConnected ? 'connected' : (useMongoDB ? 'disconnected' : 'in-memory'),
+        fileStorage: uploadsEnabled ? 'GridFS (enabled)' : 'disabled',
+        uploads: uploadsEnabled ? 'enabled' : 'disabled'
       }
     };
     
@@ -1204,24 +1252,40 @@ Generate ONLY the description, no extra text:`
 
 // PDF Upload endpoint using GridFS
 app.post('/api/notes/upload-pdf', (req, res) => {
-  console.log('📤 Upload request received at', new Date().toISOString());
+  const timestamp = new Date().toISOString();
+  console.log('');
+  console.log('='.repeat(50));
+  console.log(`📤 UPLOAD REQUEST at ${timestamp}`);
+  console.log('='.repeat(50));
   
-  if (!useMongoDB) {
-    console.log('❌ MongoDB not connected');
+  // Check MongoDB connection
+  const mongoConnected = mongoose.connection.readyState === 1;
+  console.log('📊 MongoDB state:', mongoose.connection.readyState, '(1=connected)');
+  console.log('📊 useMongoDB flag:', useMongoDB);
+  console.log('📊 mongoConnected:', mongoConnected);
+  console.log('📊 gridfsBucket:', gridfsBucket ? 'initialized' : 'NOT initialized');
+  console.log('📊 upload middleware:', upload ? 'initialized' : 'NOT initialized');
+  
+  if (!useMongoDB || !mongoConnected) {
+    console.log('❌ Upload BLOCKED - MongoDB not connected');
+    console.log('   Reason:', !useMongoDB ? 'useMongoDB is false' : 'MongoDB disconnected');
     return res.status(503).json({ 
-      message: 'File upload requires MongoDB. Currently using in-memory storage.',
-      fileId: 'temp_file_' + Date.now()
+      message: 'File upload requires MongoDB. Currently using in-memory storage. Please check server configuration.',
+      error: 'DATABASE_NOT_CONNECTED',
+      uploadsEnabled: false
     });
   }
 
-  if (!upload) {
-    console.log('❌ Multer upload not initialized');
+  if (!upload || !gridfsBucket) {
+    console.log('❌ Upload BLOCKED - GridFS not initialized');
     return res.status(503).json({ 
-      message: 'File upload system not initialized. Please restart the server.'
+      message: 'File upload system not initialized. Please restart the server.',
+      error: 'GRIDFS_NOT_INITIALIZED',
+      uploadsEnabled: false
     });
   }
 
-  console.log('🔄 Processing file with multer...');
+  console.log('✅ Pre-checks passed, processing file with multer...');
   
   // Use multer middleware for this specific route
   upload.single('pdf')(req, res, async (err) => {
