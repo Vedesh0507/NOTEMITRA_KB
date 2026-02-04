@@ -149,7 +149,7 @@ export const CURRICULUM: CurriculumData = {
       'Deep Learning Lab',
       'Operating Systems & Computer Networks Lab',
       'Full Stack Development – II',
-      'Semester Focused Design Flutter / Development with Flutter'
+      'Semester Focused Design (Flutter / Development with Flutter)'
     ],
     '6': [
       'Reinforcement Learning',
