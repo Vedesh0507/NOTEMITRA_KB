@@ -18,8 +18,10 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://192.168.1.35:3000',
-    'http://192.168.245.192:3000'
-  ],
+    'http://192.168.245.192:3000',
+    'https://notemitra-kb.vercel.app',
+    process.env.FRONTEND_URL
+  ].filter(Boolean),
   credentials: true
 }));
 app.use(express.json());
