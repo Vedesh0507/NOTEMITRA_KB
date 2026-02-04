@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { notesAPI } from '@/lib/api';
 
 export default function UploadPage() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, loading, refreshUser } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [generatingDesc, setGeneratingDesc] = useState(false);
   const [error, setError] = useState('');
@@ -32,12 +32,18 @@ export default function UploadPage() {
   const semesters = ['1', '2', '3', '4', '5', '6', '7', '8'];
   const branches = ['Computer Science', 'Electronics', 'Mechanical', 'Civil', 'Electrical', 'IT', 'Chemical', 'Biotechnology'];
 
-  // Redirect if not logged in
-  if (!user) {
-    router.push('/auth/signin');
+  // Redirect if not logged in - use useEffect for client-side navigation
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [user, loading, router]);
+
+  // Show loading state during auth check or if not authenticated
+  if (loading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Please sign in to upload notes...</p>
+        <p className="text-gray-600">Loading...</p>
       </div>
     );
   }
