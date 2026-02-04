@@ -58,7 +58,7 @@ export default function SignUpPage() {
       if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
         setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
       } else {
-        setError(err.response?.data?.error || 'Failed to create account. Please try again.');
+        setError(err.response?.data?.message || err.response?.data?.error || 'Failed to create account. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -66,7 +66,9 @@ export default function SignUpPage() {
   };
 
   const handleGoogleSignUp = () => {
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const backendUrl = apiUrl.replace('/api', '');
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   return (

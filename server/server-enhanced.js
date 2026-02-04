@@ -457,18 +457,23 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     
+    console.log('🔐 Login attempt for:', email);
+    
     // Validation: Check required fields
     if (!email || email.trim() === '') {
+      console.log('❌ Login failed: Email missing');
       return res.status(400).json({ message: 'Email is required' });
     }
     
     if (!password) {
+      console.log('❌ Login failed: Password missing');
       return res.status(400).json({ message: 'Password is required' });
     }
     
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
+      console.log('❌ Login failed: Invalid email format');
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
@@ -476,19 +481,26 @@ app.post('/api/auth/login', async (req, res) => {
       // MongoDB version - case-insensitive email search
       const user = await User.findOne({ email: email.toLowerCase().trim() });
       if (!user) {
+        console.log('❌ Login failed: User not found for email:', email.toLowerCase().trim());
         return res.status(401).json({ message: 'Invalid email or password' });
       }
 
+      console.log('✅ User found:', user.name, '| Checking password...');
+
       // Check if user is suspended
       if (user.isSuspended) {
+        console.log('❌ Login failed: User is suspended');
         return res.status(403).json({ message: 'Your account has been suspended. Please contact admin.' });
       }
 
       // Check password (simple comparison - in production use bcrypt)
       if (user.password !== password) {
+        console.log('❌ Login failed: Password mismatch');
         return res.status(401).json({ message: 'Invalid email or password' });
       }
 
+      console.log('✅ Login successful for:', user.email);
+      
       const token = 'dev_token_' + user._id;
       res.json({
         message: 'Login successful',

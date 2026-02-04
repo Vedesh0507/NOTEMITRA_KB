@@ -24,10 +24,12 @@ export default function SignInPage() {
       await login(email, password);
       router.push('/browse');
     } catch (err: any) {
+      console.error('Login error:', err);
       if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
+        setError('Cannot connect to server. Please make sure the backend is running.');
       } else {
-        setError(err.response?.data?.error || 'Failed to sign in. Please check your credentials.');
+        // Backend returns 'message' field for errors
+        setError(err.response?.data?.message || err.response?.data?.error || 'Failed to sign in. Please check your credentials.');
       }
     } finally {
       setLoading(false);
@@ -36,7 +38,9 @@ export default function SignInPage() {
 
   const handleGoogleSignIn = () => {
     // Redirect to backend Google OAuth endpoint
-    window.location.href = 'http://localhost:5000/api/auth/google';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const backendUrl = apiUrl.replace('/api', '');
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   return (
