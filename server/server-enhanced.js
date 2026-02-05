@@ -1168,6 +1168,97 @@ app.post('/api/auth/update-google-user', async (req, res) => {
   }
 });
 
+// Update user profile (general profile update)
+app.put('/api/auth/profile', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !token.startsWith('dev_token_')) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = token.replace('dev_token_', '');
+    const { name, branch, section, rollNo } = req.body;
+
+    // Validate name if provided
+    if (name !== undefined && (!name || name.trim().length === 0)) {
+      return res.status(400).json({ message: 'Name cannot be empty' });
+    }
+
+    if (useMongoDB) {
+      // MongoDB version - validate ObjectId
+      if (!mongoose.Types.ObjectId.isValid(userId)) {
+        return res.status(401).json({ message: 'Invalid user ID' });
+      }
+
+      // Build update object with only provided fields
+      const updateData = {};
+      if (name !== undefined) updateData.name = name.trim();
+      if (branch !== undefined) updateData.branch = branch;
+      if (section !== undefined) updateData.section = section;
+      if (rollNo !== undefined) updateData.rollNo = rollNo;
+
+      const user = await User.findByIdAndUpdate(
+        userId,
+        updateData,
+        { new: true }
+      ).select('-password').lean();
+
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      console.log('✅ Profile updated for user:', user.email);
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: { 
+          id: user._id, 
+          name: user.name, 
+          email: user.email, 
+          role: user.role, 
+          branch: user.branch, 
+          section: user.section,
+          rollNo: user.rollNo,
+          isAdmin: user.isAdmin,
+          reputation: user.reputation || 0
+        }
+      });
+    } else {
+      // In-memory version
+      const user = users.find(u => u.id === userId);
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Update only provided fields
+      if (name !== undefined) user.name = name.trim();
+      if (branch !== undefined) user.branch = branch;
+      if (section !== undefined) user.section = section;
+      if (rollNo !== undefined) user.rollNo = rollNo;
+
+      console.log('✅ Profile updated for user:', user.email);
+
+      res.json({
+        message: 'Profile updated successfully',
+        user: { 
+          id: user.id, 
+          name: user.name, 
+          email: user.email, 
+          role: user.role, 
+          branch: user.branch, 
+          section: user.section,
+          rollNo: user.rollNo,
+          isAdmin: user.isAdmin,
+          reputation: user.reputation || 0
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Admin Middleware
 const adminMiddleware = async (req, res, next) => {
   try {

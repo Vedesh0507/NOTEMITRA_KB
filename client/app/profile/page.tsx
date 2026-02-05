@@ -17,9 +17,12 @@ import {
   Award,
   FileText,
   Calendar,
-  TrendingUp
+  TrendingUp,
+  X,
+  Loader2,
+  Check
 } from 'lucide-react';
-import { notesAPI } from '@/lib/api';
+import { notesAPI, authAPI } from '@/lib/api';
 
 interface UserNote {
   id: number;
@@ -33,13 +36,33 @@ interface UserNote {
   createdAt: string;
 }
 
+// Branch options
+const BRANCHES = [
+  'CSE', 'CSE-AIML', 'CSE-DS', 'CSE-CS', 'ECE', 'EEE', 'MECH', 'CIVIL', 'IT', 'AIML', 'AIDS', 'Other'
+];
+
+// Section options
+const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, setUser } = useAuth();
   const [uploadedNotes, setUploadedNotes] = useState<UserNote[]>([]);
   const [savedNotes, setSavedNotes] = useState<UserNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'uploaded' | 'saved'>('uploaded');
+
+  // Edit Profile Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState('');
+  const [editSuccess, setEditSuccess] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    branch: '',
+    section: '',
+    rollNo: ''
+  });
 
   useEffect(() => {
     if (!user) {
@@ -49,6 +72,18 @@ export default function ProfilePage() {
     refreshUser(); // Refresh user data to get latest stats
     fetchUserData();
   }, [user?.id]); // Re-fetch when user ID changes
+
+  // Initialize edit form when user data loads
+  useEffect(() => {
+    if (user) {
+      setEditForm({
+        name: user.name || '',
+        branch: user.branch || '',
+        section: user.section || '',
+        rollNo: (user as any).rollNo || ''
+      });
+    }
+  }, [user]);
 
   const fetchUserData = async () => {
     try {
@@ -79,6 +114,59 @@ export default function ProfilePage() {
       console.error('Failed to fetch user data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditError('');
+    setEditSuccess(false);
+    setEditLoading(true);
+
+    try {
+      const response = await authAPI.updateProfile({
+        name: editForm.name.trim(),
+        branch: editForm.branch,
+        section: editForm.section,
+        rollNo: editForm.rollNo.trim()
+      });
+
+      if (response.data.user) {
+        // Update local user state
+        setUser({
+          ...user!,
+          name: response.data.user.name,
+          branch: response.data.user.branch,
+          section: response.data.user.section,
+          ...(response.data.user.rollNo && { rollNo: response.data.user.rollNo })
+        } as any);
+        
+        // Update localStorage
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          localStorage.setItem('user', JSON.stringify({
+            ...parsedUser,
+            name: response.data.user.name,
+            branch: response.data.user.branch,
+            section: response.data.user.section,
+            rollNo: response.data.user.rollNo
+          }));
+        }
+      }
+
+      setEditSuccess(true);
+      
+      // Close modal after short delay
+      setTimeout(() => {
+        setShowEditModal(false);
+        setEditSuccess(false);
+        refreshUser(); // Refresh user data
+      }, 1500);
+    } catch (err: any) {
+      setEditError(err.response?.data?.message || 'Failed to update profile. Please try again.');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -125,7 +213,7 @@ export default function ProfilePage() {
 
               {/* Edit Profile Button */}
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => alert('Edit profile coming soon!')}>
+                <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Profile
                 </Button>
@@ -340,6 +428,172 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Profile Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditError('');
+                  setEditSuccess(false);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              {/* Success Message */}
+              {editSuccess && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 text-green-700 rounded-lg">
+                  <Check className="w-5 h-5" />
+                  <span>Profile updated successfully!</span>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {editError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+                  {editError}
+                </div>
+              )}
+
+              {/* Name Field */}
+              <div>
+                <label htmlFor="edit-name" className="block text-sm font-medium text-gray-700 mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="edit-name"
+                  type="text"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  required
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Enter your full name"
+                />
+              </div>
+
+              {/* Branch Field */}
+              <div>
+                <label htmlFor="edit-branch" className="block text-sm font-medium text-gray-700 mb-1">
+                  Branch
+                </label>
+                <select
+                  id="edit-branch"
+                  value={editForm.branch}
+                  onChange={(e) => setEditForm({ ...editForm, branch: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Branch</option>
+                  {BRANCHES.map((branch) => (
+                    <option key={branch} value={branch}>{branch}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Section Field */}
+              <div>
+                <label htmlFor="edit-section" className="block text-sm font-medium text-gray-700 mb-1">
+                  Section
+                </label>
+                <select
+                  id="edit-section"
+                  value={editForm.section}
+                  onChange={(e) => setEditForm({ ...editForm, section: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">Select Section</option>
+                  {SECTIONS.map((section) => (
+                    <option key={section} value={section}>{section}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Roll No Field */}
+              <div>
+                <label htmlFor="edit-rollNo" className="block text-sm font-medium text-gray-700 mb-1">
+                  Roll Number
+                </label>
+                <input
+                  id="edit-rollNo"
+                  type="text"
+                  value={editForm.rollNo}
+                  onChange={(e) => setEditForm({ ...editForm, rollNo: e.target.value.toUpperCase() })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="e.g., 24H71A6132"
+                />
+              </div>
+
+              {/* Email (Read Only) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={user?.email || ''}
+                  disabled
+                  className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+                />
+                <p className="mt-1 text-xs text-gray-500">Email cannot be changed</p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditError('');
+                    setEditSuccess(false);
+                    // Reset form to current user values
+                    if (user) {
+                      setEditForm({
+                        name: user.name || '',
+                        branch: user.branch || '',
+                        section: user.section || '',
+                        rollNo: (user as any).rollNo || ''
+                      });
+                    }
+                  }}
+                  disabled={editLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1"
+                  disabled={editLoading || editSuccess}
+                >
+                  {editLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : editSuccess ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Saved!
+                    </>
+                  ) : (
+                    'Save Changes'
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

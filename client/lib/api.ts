@@ -111,6 +111,9 @@ export const authAPI = {
 
   verifyEmailForReset: (email: string) =>
     api.post('/auth/verify-email-for-reset', { email }),
+
+  updateProfile: (data: { name?: string; branch?: string; section?: string; rollNo?: string }) =>
+    api.put('/auth/profile', data),
 };
 
 // Notes API
