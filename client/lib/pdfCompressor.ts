@@ -1,7 +1,6 @@
 import { PDFDocument } from 'pdf-lib';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-const TARGET_SIZE = 9.5 * 1024 * 1024; // Target slightly under 10MB for safety
 
 export interface CompressionResult {
   file: File;
@@ -106,7 +105,6 @@ export async function compressPDF(
     onProgress?.({ stage: 'finalizing', message: 'Creating compressed file...' });
 
     // Create a new File from the compressed bytes
-    // Use Uint8Array.from() to ensure proper type compatibility
     const compressedFile = new File(
       [new Uint8Array(compressedBytes)],
       file.name,
