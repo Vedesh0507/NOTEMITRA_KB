@@ -26,7 +26,14 @@ const gmailTransporter = nodemailer.createTransport({
   auth: {
     user: process.env.GMAIL_USER || 'notemitravg@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD // App password from Google Account
-  }
+  },
+  // Connection settings for faster email delivery
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 15000
 });
 
 // Configure Cloudinary
@@ -899,13 +906,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         
         console.log('📧 Password reset requested for:', normalizedEmail);
         
-        // Try to send email (may only work for verified emails on free tier)
-        await sendResetEmail(normalizedEmail, resetUrl);
+        // Send email in background (don't wait for it to complete)
+        sendResetEmail(normalizedEmail, resetUrl).catch(err => {
+          console.error('Background email send failed:', err);
+        });
         
-        // Always return reset URL since email delivery is limited on free tier
+        // Respond immediately to user
         return res.json({ 
-          message: 'Password reset link generated',
-          _dev_resetUrl: resetUrl 
+          message: 'If an account with that email exists, a password reset link has been sent.',
         });
       }
     } else {
@@ -920,12 +928,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         
         console.log('📧 Password reset requested for:', normalizedEmail);
         
-        await sendResetEmail(normalizedEmail, resetUrl);
+        // Send email in background (don't wait for it to complete)
+        sendResetEmail(normalizedEmail, resetUrl).catch(err => {
+          console.error('Background email send failed:', err);
+        });
         
-        // Always return reset URL since email delivery is limited on free tier
+        // Respond immediately to user
         return res.json({ 
-          message: 'Password reset link generated',
-          _dev_resetUrl: resetUrl 
+          message: 'If an account with that email exists, a password reset link has been sent.',
         });
       }
     }
