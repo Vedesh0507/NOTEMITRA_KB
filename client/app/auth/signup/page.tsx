@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Mail, Lock, User, Chrome, GraduationCap } from 'lucide-react';
+import { Mail, Lock, User, Chrome, GraduationCap, Eye, EyeOff } from 'lucide-react';
+
+const ALLOWED_EMAIL_DOMAIN = '@mictech.edu.in';
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -20,8 +22,18 @@ export default function SignUpPage() {
     section: '',
     rollNo: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return false;
+    }
+    return email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN);
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -30,6 +42,12 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Validate email domain
+    if (!validateEmail(formData.email)) {
+      setError(`Please use your college email ending with ${ALLOWED_EMAIL_DOMAIN}`);
+      return;
+    }
 
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
@@ -46,7 +64,7 @@ export default function SignUpPage() {
     try {
       await signup({
         name: formData.name,
-        email: formData.email,
+        email: formData.email.toLowerCase(),
         password: formData.password,
         role: formData.role,
         branch: formData.branch || undefined,
@@ -54,11 +72,12 @@ export default function SignUpPage() {
         rollNo: formData.rollNo || undefined,
       });
       router.push('/browse');
-    } catch (err: any) {
-      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
+    } catch (err: unknown) {
+      const error = err as { code?: string; message?: string; response?: { data?: { message?: string; error?: string } } };
+      if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
         setError('Cannot connect to server. Please make sure the backend is running on port 5000.');
       } else {
-        setError(err.response?.data?.message || err.response?.data?.error || 'Failed to create account. Please try again.');
+        setError(error.response?.data?.message || error.response?.data?.error || 'Failed to create account. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -107,7 +126,7 @@ export default function SignUpPage() {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address
+              College Email
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -119,9 +138,12 @@ export default function SignUpPage() {
                 onChange={handleChange}
                 required
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@example.com"
+                placeholder={`your.name${ALLOWED_EMAIL_DOMAIN}`}
               />
             </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Must end with {ALLOWED_EMAIL_DOMAIN}
+            </p>
           </div>
 
           <div>
@@ -194,13 +216,20 @@ export default function SignUpPage() {
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
 
@@ -213,13 +242,20 @@ export default function SignUpPage() {
               <input
                 id="confirmPassword"
                 name="confirmPassword"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
           </div>
 
