@@ -10,14 +10,24 @@ const Anthropic = require('@anthropic-ai/sdk');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const cloudinary = require('cloudinary').v2;
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Initialize Resend for emails
+// Initialize Resend for emails (fallback)
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Initialize Gmail transporter for sending emails
+const gmailTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER || 'notemitravg@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD // App password from Google Account
+  }
+});
 
 // Configure Cloudinary
 cloudinary.config({
@@ -790,6 +800,48 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     // Helper function to send reset email
     const sendResetEmail = async (userEmail, resetUrl) => {
       try {
+        // Try Gmail SMTP first (preferred)
+        if (process.env.GMAIL_APP_PASSWORD) {
+          const mailOptions = {
+            from: '"NoteMitra" <notemitravg@gmail.com>',
+            to: userEmail,
+            subject: 'Reset Your NoteMitra Password',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%); padding: 30px; text-align: center;">
+                  <h1 style="color: white; margin: 0;">NoteMitra</h1>
+                </div>
+                <div style="padding: 30px; background: #f9fafb;">
+                  <h2 style="color: #1f2937;">Reset Your Password</h2>
+                  <p style="color: #4b5563; font-size: 16px;">
+                    We received a request to reset your password. Click the button below to create a new password:
+                  </p>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetUrl}" style="background: #3B82F6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                      Reset Password
+                    </a>
+                  </div>
+                  <p style="color: #6b7280; font-size: 14px;">
+                    This link will expire in 15 minutes. If you didn't request a password reset, you can safely ignore this email.
+                  </p>
+                  <p style="color: #6b7280; font-size: 14px;">
+                    If the button doesn't work, copy and paste this link: ${resetUrl}
+                  </p>
+                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+                    © ${new Date().getFullYear()} NoteMitra - MIC College of Technology
+                  </p>
+                </div>
+              </div>
+            `
+          };
+          
+          await gmailTransporter.sendMail(mailOptions);
+          console.log('✅ Password reset email sent via Gmail to:', userEmail);
+          return true;
+        }
+        
+        // Fallback to Resend if Gmail not configured
         if (process.env.RESEND_API_KEY) {
           await resend.emails.send({
             from: 'NoteMitra <onboarding@resend.dev>',
@@ -821,9 +873,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
               </div>
             `
           });
-          console.log('✅ Password reset email sent to:', userEmail);
+          console.log('✅ Password reset email sent via Resend to:', userEmail);
           return true;
         }
+        
+        console.log('⚠️ No email service configured (GMAIL_APP_PASSWORD or RESEND_API_KEY)');
         return false;
       } catch (emailError) {
         console.error('❌ Failed to send email:', emailError);
