@@ -250,6 +250,8 @@ async function connectMongoDB() {
       totalViews: { type: Number, default: 0 },
       notesUploaded: { type: Number, default: 0 },
       reputation: { type: Number, default: 0 },
+      resetToken: String,
+      resetTokenExpiry: Date,
       createdAt: { type: Date, default: Date.now }
     });
 
@@ -703,6 +705,159 @@ app.get('/api/auth/me', async (req, res) => {
 
 app.post('/api/auth/logout', (req, res) => {
   res.json({ message: 'Logged out successfully' });
+});
+
+// Forgot Password - Generate reset token
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Generate a random reset token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findOne({ email: normalizedEmail });
+      
+      if (user) {
+        user.resetToken = resetToken;
+        user.resetTokenExpiry = resetTokenExpiry;
+        await user.save();
+        
+        // Generate reset URL
+        const frontendUrl = process.env.FRONTEND_URL || 'https://notemitra-kb.vercel.app';
+        const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+        
+        console.log('📧 Password reset requested for:', normalizedEmail);
+        console.log('🔗 Reset URL:', resetUrl);
+        
+        // Return reset URL directly (since email is not configured)
+        return res.json({ 
+          message: 'Password reset link generated',
+          _dev_resetUrl: resetUrl 
+        });
+      }
+    } else {
+      // In-memory mode
+      const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+      if (user) {
+        user.resetToken = resetToken;
+        user.resetTokenExpiry = resetTokenExpiry;
+        
+        const frontendUrl = process.env.FRONTEND_URL || 'https://notemitra-kb.vercel.app';
+        const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
+        
+        console.log('📧 Password reset requested for:', normalizedEmail);
+        console.log('🔗 Reset URL:', resetUrl);
+        
+        return res.json({ 
+          message: 'Password reset link generated',
+          _dev_resetUrl: resetUrl 
+        });
+      }
+    }
+
+    // Always return success for security (don't reveal if email exists)
+    res.json({ message: 'If an account exists, a reset link has been sent' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Verify Reset Token
+app.post('/api/auth/verify-reset-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ valid: false, message: 'Token is required' });
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findOne({ 
+        resetToken: token,
+        resetTokenExpiry: { $gt: new Date() }
+      });
+      
+      if (user) {
+        return res.json({ valid: true });
+      }
+    } else {
+      const user = users.find(u => u.resetToken === token && u.resetTokenExpiry > new Date());
+      if (user) {
+        return res.json({ valid: true });
+      }
+    }
+
+    res.json({ valid: false, message: 'Invalid or expired token' });
+  } catch (error) {
+    console.error('Verify token error:', error);
+    res.status(500).json({ valid: false, message: 'Server error' });
+  }
+});
+
+// Reset Password
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body;
+    
+    if (!token || !password) {
+      return res.status(400).json({ message: 'Token and password are required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findOne({ 
+        resetToken: token,
+        resetTokenExpiry: { $gt: new Date() }
+      });
+      
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired reset token' });
+      }
+
+      user.password = hashedPassword;
+      user.resetToken = undefined;
+      user.resetTokenExpiry = undefined;
+      await user.save();
+
+      console.log('✅ Password reset successful for:', user.email);
+      return res.json({ message: 'Password reset successful' });
+    } else {
+      const user = users.find(u => u.resetToken === token && u.resetTokenExpiry > new Date());
+      
+      if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired reset token' });
+      }
+
+      user.password = hashedPassword;
+      user.resetToken = undefined;
+      user.resetTokenExpiry = undefined;
+
+      console.log('✅ Password reset successful for:', user.email);
+      return res.json({ message: 'Password reset successful' });
+    }
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // Update Google user details (for new users completing profile)
