@@ -107,6 +107,9 @@ export const authAPI = {
 
   verifyResetToken: (token: string) =>
     api.post('/auth/verify-reset-token', { token }),
+
+  verifyEmailForReset: (email: string) =>
+    api.post('/auth/verify-email-for-reset', { email }),
 };
 
 // Notes API

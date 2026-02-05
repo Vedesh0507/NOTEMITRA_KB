@@ -979,6 +979,63 @@ app.post('/api/auth/verify-reset-token', async (req, res) => {
   }
 });
 
+// Verify Email and Get Direct Reset Token (No email sending)
+app.post('/api/auth/verify-email-for-reset', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Generate a random reset token
+    const crypto = require('crypto');
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findOne({ email: normalizedEmail });
+      
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'No account found with this email address' });
+      }
+
+      user.resetToken = resetToken;
+      user.resetTokenExpiry = resetTokenExpiry;
+      await user.save();
+
+      console.log('✅ Direct password reset initiated for:', normalizedEmail);
+      return res.json({ 
+        success: true, 
+        token: resetToken,
+        message: 'Email verified. You can now reset your password.'
+      });
+    } else {
+      // In-memory mode
+      const user = users.find(u => u.email.toLowerCase() === normalizedEmail);
+      
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'No account found with this email address' });
+      }
+
+      user.resetToken = resetToken;
+      user.resetTokenExpiry = resetTokenExpiry;
+
+      console.log('✅ Direct password reset initiated for:', normalizedEmail);
+      return res.json({ 
+        success: true, 
+        token: resetToken,
+        message: 'Email verified. You can now reset your password.'
+      });
+    }
+  } catch (error) {
+    console.error('Verify email for reset error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Reset Password
 app.post('/api/auth/reset-password', async (req, res) => {
   try {

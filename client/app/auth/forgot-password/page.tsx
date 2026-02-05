@@ -2,19 +2,29 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Mail, ArrowLeft, CheckCircle, Copy, Check } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { authAPI } from '@/lib/api';
 
 const ALLOWED_EMAIL_DOMAIN = '@mictech.edu.in';
 
 export default function ForgotPasswordPage() {
+  const router = useRouter();
+  
+  // Step 1: Email verification state
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // Step 2: Password reset state
+  const [step, setStep] = useState<'email' | 'reset'>('email');
+  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [devResetUrl, setDevResetUrl] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,15 +34,8 @@ export default function ForgotPasswordPage() {
     return email.toLowerCase().endsWith(ALLOWED_EMAIL_DOMAIN);
   };
 
-  const copyToClipboard = async () => {
-    if (devResetUrl) {
-      await navigator.clipboard.writeText(devResetUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 1: Verify email and get reset token
+  const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -45,33 +48,73 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await authAPI.forgotPassword(email.toLowerCase());
+      const response = await authAPI.verifyEmailForReset(email.toLowerCase());
       
-      // Check if dev reset URL is provided (when email not configured)
-      if (response.data._dev_resetUrl) {
-        setDevResetUrl(response.data._dev_resetUrl);
+      if (response.data.success && response.data.token) {
+        setResetToken(response.data.token);
+        setStep('reset');
+      } else {
+        setError(response.data.message || 'Failed to verify email');
       }
-      
-      setSuccess(true);
     } catch (err: any) {
-      if (err.response?.status === 429) {
+      if (err.response?.status === 404) {
+        setError('No account found with this email address. Please check your email or create a new account.');
+      } else if (err.response?.status === 429) {
         const retryAfter = err.response?.data?.retryAfter || 900;
         const minutes = Math.ceil(retryAfter / 60);
-        setError(`Too many password reset requests. Please try again in ${minutes} minutes.`);
-      } else if (err.response?.data?.errors) {
-        const validationErrors = err.response.data.errors;
-        setError(validationErrors.map((e: any) => e.msg).join('. '));
-      } else if (err.response?.data?.error) {
-        setError(err.response.data.error);
+        setError(`Too many requests. Please try again in ${minutes} minutes.`);
       } else {
-        // For security, still show success even if there's an error
-        setSuccess(true);
+        setError(err.response?.data?.message || 'Failed to verify email. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // Step 2: Reset password with the token
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    // Validate password length
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return;
+    }
+
+    // Validate password match
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await authAPI.resetPassword({
+        token: resetToken!,
+        password,
+        confirmPassword
+      });
+      setSuccess(true);
+      
+      // Redirect to login after 3 seconds
+      setTimeout(() => {
+        router.push('/auth/signin');
+      }, 3000);
+    } catch (err: any) {
+      if (err.response?.data?.errors) {
+        const validationErrors = err.response.data.errors;
+        setError(validationErrors.map((e: any) => e.msg).join('. '));
+      } else {
+        setError(err.response?.data?.message || 'Failed to reset password. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Success Screen
   if (success) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4 py-12">
@@ -82,59 +125,20 @@ export default function ForgotPasswordPage() {
             </div>
           </div>
           
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful!</h1>
           <p className="text-gray-600 mb-6">
-            If an account exists for <span className="font-medium">{email}</span>, 
-            we've sent a password reset link. The link will expire in 15 minutes.
+            Your password has been reset successfully. 
+            You will be redirected to the login page shortly.
           </p>
 
-          {/* Show reset URL directly */}
-          {devResetUrl && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-              <p className="text-sm text-blue-800 font-medium mb-2">
-                🔗 Your Password Reset Link
-              </p>
-              <p className="text-xs text-blue-700 mb-3">
-                Click the button below to reset your password:
-              </p>
-              <Link 
-                href={devResetUrl} 
-                className="inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-              >
-                Reset Password →
-              </Link>
-              <div className="flex items-center gap-2 mt-3">
-                <input 
-                  type="text" 
-                  value={devResetUrl} 
-                  readOnly 
-                  className="flex-1 text-xs p-2 bg-white border border-blue-300 rounded truncate"
-                />
-                <button
-                  onClick={copyToClipboard}
-                  className="p-2 bg-blue-100 hover:bg-blue-200 rounded transition-colors"
-                  title="Copy to clipboard"
-                >
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-blue-700" />}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {!devResetUrl && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-blue-700">
-                <strong>Didn't receive the email?</strong>
-                <br />
-                Check your spam folder or make sure you entered the correct email address.
-              </p>
-            </div>
-          )}
+          <div className="flex items-center justify-center text-sm text-gray-500 mb-6">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            Redirecting to login...
+          </div>
 
           <Link href="/auth/signin">
-            <Button variant="outline" className="w-full">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Sign In
+            <Button className="w-full">
+              Go to Sign In Now
             </Button>
           </Link>
         </div>
@@ -142,13 +146,132 @@ export default function ForgotPasswordPage() {
     );
   }
 
+  // Step 2: Password Reset Form
+  if (step === 'reset') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="h-12 w-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <Lock className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h1>
+            <p className="text-gray-600">
+              Create a new password for <span className="font-medium text-blue-600">{email}</span>
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handlePasswordReset} className="space-y-4">
+            {/* New Password */}
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                New Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError('');
+                  }}
+                  required
+                  minLength={8}
+                  className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Minimum 8 characters
+              </p>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm Password <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    setError('');
+                  }}
+                  required
+                  className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Resetting Password...
+                </>
+              ) : (
+                'Reset Password'
+              )}
+            </Button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button 
+              onClick={() => {
+                setStep('email');
+                setResetToken(null);
+                setPassword('');
+                setConfirmPassword('');
+                setError('');
+              }}
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium inline-flex items-center"
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Use a different email
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 1: Email Verification Form
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Forgot Password?</h1>
           <p className="text-gray-600">
-            Enter your college email address and we'll send you a link to reset your password.
+            Enter your college email address to reset your password.
           </p>
         </div>
 
@@ -158,7 +281,7 @@ export default function ForgotPasswordPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleEmailSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
               College Email <span className="text-red-500">*</span>
@@ -184,7 +307,14 @@ export default function ForgotPasswordPage() {
           </div>
 
           <Button type="submit" className="w-full" size="lg" disabled={loading}>
-            {loading ? 'Sending...' : 'Send Reset Link'}
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Verifying...
+              </>
+            ) : (
+              'Continue'
+            )}
           </Button>
         </form>
 
