@@ -113,8 +113,13 @@ export const authAPI = {
 export const notesAPI = {
   uploadPDF: (formData: FormData) => {
     console.log('📡 API Base URL:', API_URL);
-    console.log('📡 Full URL:', `${API_URL}/notes/upload-pdf`);
-    // Don't set Content-Type - axios will automatically set it with proper boundary for FormData
+    console.log('📡 Full URL:', `${API_URL}/notes/upload-pdf-cloudinary`);
+    // Use Cloudinary upload endpoint
+    return api.post('/notes/upload-pdf-cloudinary', formData);
+  },
+
+  // Fallback to GridFS if needed
+  uploadPDFGridFS: (formData: FormData) => {
     return api.post('/notes/upload-pdf', formData);
   },
 
@@ -134,6 +139,7 @@ export const notesAPI = {
     section?: string;
     fileUrl: string;
     fileId?: string;
+    cloudinaryId?: string;
     fileSize: number;
     pages?: number;
   }) => api.post('/notes', data),

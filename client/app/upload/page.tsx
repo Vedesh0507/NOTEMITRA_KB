@@ -222,10 +222,17 @@ export default function UploadPage() {
       console.log('✅ Upload response:', uploadResponse.data);
       
       setUploadProgress(60);
-      const fileId = uploadResponse.data.fileId;
+      
+      // Handle both Cloudinary and GridFS responses
+      const fileId = uploadResponse.data.fileId || uploadResponse.data.cloudinaryId;
+      const fileUrl = uploadResponse.data.fileUrl || uploadResponse.data.cloudinaryUrl || `/api/notes/download-pdf/${fileId}`;
+      const cloudinaryId = uploadResponse.data.cloudinaryId;
+      
       console.log('📝 File ID received:', fileId);
+      console.log('🔗 File URL:', fileUrl);
+      console.log('☁️ Cloudinary ID:', cloudinaryId);
 
-      // Create note data with fileId
+      // Create note data with fileId and/or cloudinaryId
       const noteData = {
         title: formData.title,
         description: formData.description,
@@ -233,8 +240,9 @@ export default function UploadPage() {
         semester: formData.semester,
         module: formData.module,
         branch: formData.branch,
-        fileId: fileId,
-        fileUrl: `/api/notes/download-pdf/${fileId}`,
+        fileId: cloudinaryId ? undefined : fileId, // Only use for GridFS
+        cloudinaryId: cloudinaryId,
+        fileUrl: fileUrl,
         fileSize: selectedFile.size,
         fileName: selectedFile.name,
         tags: formData.tags

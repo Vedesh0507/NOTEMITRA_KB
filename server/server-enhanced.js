@@ -9,6 +9,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
 const { Resend } = require('resend');
+const cloudinary = require('cloudinary').v2;
 require('dotenv').config();
 
 const app = express();
@@ -16,6 +17,26 @@ const PORT = process.env.PORT || 5000;
 
 // Initialize Resend for emails
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+// Multer configuration for file uploads (memory storage for Cloudinary)
+const uploadMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'), false);
+    }
+  }
+});
 
 // Middleware
 app.use(cors({
@@ -268,7 +289,9 @@ async function connectMongoDB() {
       branch: String,
       fileName: String,
       fileUrl: String,
-      fileId: mongoose.Schema.Types.ObjectId, // GridFS file ID
+      fileId: mongoose.Schema.Types.ObjectId, // GridFS file ID (legacy)
+      cloudinaryId: String, // Cloudinary public ID
+      cloudinaryUrl: String, // Cloudinary secure URL
       fileSize: Number,
       tags: String,
       userId: mongoose.Schema.Types.ObjectId,
@@ -1586,6 +1609,70 @@ app.post('/api/notes/upload-pdf', (req, res) => {
   });
 });
 
+// Cloudinary PDF Upload endpoint (Primary method)
+app.post('/api/notes/upload-pdf-cloudinary', uploadMemory.single('pdf'), async (req, res) => {
+  try {
+    console.log('');
+    console.log('='.repeat(50));
+    console.log('☁️ CLOUDINARY UPLOAD REQUEST');
+    console.log('='.repeat(50));
+
+    if (!req.file) {
+      console.log('❌ No file in request');
+      return res.status(400).json({ message: 'No PDF file provided' });
+    }
+
+    console.log('✅ File received:', req.file.originalname, req.file.size, 'bytes');
+
+    // Validate file type
+    if (req.file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ message: 'Only PDF files are allowed' });
+    }
+
+    // Validate file size (max 50MB for Cloudinary)
+    const maxSize = 50 * 1024 * 1024;
+    if (req.file.size > maxSize) {
+      return res.status(400).json({ 
+        message: `File size exceeds 50MB limit. Your file is ${(req.file.size / (1024 * 1024)).toFixed(2)}MB` 
+      });
+    }
+
+    // Upload to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'raw',
+          folder: 'notemitra/pdfs',
+          public_id: `${Date.now()}-${req.file.originalname.replace(/\.pdf$/i, '')}`,
+          format: 'pdf'
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(req.file.buffer);
+    });
+
+    console.log('✅ File uploaded to Cloudinary successfully');
+    console.log('🔗 URL:', result.secure_url);
+    console.log('🆔 Public ID:', result.public_id);
+
+    res.json({
+      message: 'File uploaded successfully',
+      fileUrl: result.secure_url,
+      fileId: result.public_id,
+      filename: req.file.originalname,
+      size: req.file.size,
+      cloudinaryId: result.public_id
+    });
+
+  } catch (error) {
+    console.error('❌ Cloudinary upload error:', error);
+    res.status(500).json({ message: 'Error uploading file to Cloudinary', error: error.message });
+  }
+});
+
 // Download PDF from GridFS
 // View PDF inline (for preview)
 app.get('/api/notes/view-pdf/:fileId', async (req, res) => {
@@ -1966,6 +2053,8 @@ app.post('/api/notes', async (req, res) => {
   try {
     console.log('📝 Creating note with data:', JSON.stringify(req.body, null, 2));
     console.log('📎 fileId in request:', req.body.fileId, 'type:', typeof req.body.fileId);
+    console.log('☁️ cloudinaryId in request:', req.body.cloudinaryId);
+    console.log('🔗 fileUrl in request:', req.body.fileUrl);
     
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token || !token.startsWith('dev_token_')) {
@@ -1975,7 +2064,7 @@ app.post('/api/notes', async (req, res) => {
     const userId = token.replace('dev_token_', '');
     
     // Validate required fields
-    const { title, description, subject, semester, fileId } = req.body;
+    const { title, description, subject, semester, fileId, fileUrl, cloudinaryId } = req.body;
     
     if (!title || title.trim() === '') {
       return res.status(400).json({ message: 'Title is required' });
@@ -1998,8 +2087,9 @@ app.post('/api/notes', async (req, res) => {
       return res.status(400).json({ message: 'Invalid semester. Must be a number between 1 and 8' });
     }
     
-    if (!fileId || fileId.trim() === '') {
-      return res.status(400).json({ message: 'File ID is required. Please upload a PDF first' });
+    // Either fileId (GridFS) or fileUrl (Cloudinary) is required
+    if ((!fileId || fileId.trim() === '') && (!fileUrl || fileUrl.trim() === '')) {
+      return res.status(400).json({ message: 'File is required. Please upload a PDF first' });
     }
 
     if (useMongoDB) {
@@ -2014,6 +2104,8 @@ app.post('/api/notes', async (req, res) => {
         title: title.trim(),
         description: description.trim(),
         subject: subject.trim(),
+        cloudinaryId: cloudinaryId || null,
+        cloudinaryUrl: fileUrl || null,
         userId: user._id,
         userName: user.name,
         views: 0,
@@ -2022,9 +2114,9 @@ app.post('/api/notes', async (req, res) => {
         downvotes: 0
       });
       
-      console.log('💾 Saving note with fileId:', note.fileId);
+      console.log('💾 Saving note with fileId:', note.fileId, 'cloudinaryId:', note.cloudinaryId);
       await note.save();
-      console.log('✅ Note saved with ID:', note._id, 'fileId:', note.fileId);
+      console.log('✅ Note saved with ID:', note._id, 'fileId:', note.fileId, 'cloudinaryUrl:', note.cloudinaryUrl);
 
       // Increment user's notesUploaded count
       await User.findByIdAndUpdate(userId, { $inc: { notesUploaded: 1 } });
