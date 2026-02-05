@@ -346,12 +346,20 @@ app.get('/api/health', (req, res) => {
     const mongoConnected = mongoose.connection.readyState === 1;
     const uploadsEnabled = useMongoDB && mongoConnected && gridfsBucket !== undefined;
     
+    // Check Cloudinary configuration
+    const cloudinaryConfigured = !!(
+      process.env.CLOUDINARY_CLOUD_NAME && 
+      process.env.CLOUDINARY_API_KEY && 
+      process.env.CLOUDINARY_API_SECRET
+    );
+    
     const healthData = {
       status: 'ok',
       message: 'NoteMitra API is running',
       database: useMongoDB ? 'MongoDB' : 'In-Memory',
       mongoConnected: mongoConnected,
-      uploadsEnabled: uploadsEnabled,
+      uploadsEnabled: uploadsEnabled || cloudinaryConfigured,
+      cloudinaryEnabled: cloudinaryConfigured,
       timestamp: new Date().toISOString(),
       uptime: Math.floor(process.uptime()),
       version: '1.0.0',
@@ -359,8 +367,9 @@ app.get('/api/health', (req, res) => {
       services: {
         api: 'operational',
         database: mongoConnected ? 'connected' : (useMongoDB ? 'disconnected' : 'in-memory'),
-        fileStorage: uploadsEnabled ? 'GridFS (enabled)' : 'disabled',
-        uploads: uploadsEnabled ? 'enabled' : 'disabled'
+        fileStorage: cloudinaryConfigured ? 'Cloudinary' : (uploadsEnabled ? 'GridFS' : 'disabled'),
+        uploads: (uploadsEnabled || cloudinaryConfigured) ? 'enabled' : 'disabled',
+        cloudinary: cloudinaryConfigured ? 'configured' : 'not configured'
       }
     };
     
@@ -1616,20 +1625,38 @@ app.post('/api/notes/upload-pdf-cloudinary', uploadMemory.single('pdf'), async (
     console.log('='.repeat(50));
     console.log('☁️ CLOUDINARY UPLOAD REQUEST');
     console.log('='.repeat(50));
+    
+    // Debug: Check Cloudinary configuration
+    console.log('🔧 Cloudinary Config Check:');
+    console.log('   Cloud Name:', process.env.CLOUDINARY_CLOUD_NAME ? '✅ Set' : '❌ MISSING');
+    console.log('   API Key:', process.env.CLOUDINARY_API_KEY ? '✅ Set' : '❌ MISSING');
+    console.log('   API Secret:', process.env.CLOUDINARY_API_SECRET ? '✅ Set (hidden)' : '❌ MISSING');
+    
+    // Verify Cloudinary is configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('❌ Cloudinary credentials not configured!');
+      return res.status(503).json({ 
+        message: 'File storage not configured. Please contact administrator.',
+        error: 'CLOUDINARY_NOT_CONFIGURED'
+      });
+    }
 
     if (!req.file) {
       console.log('❌ No file in request');
       return res.status(400).json({ message: 'No PDF file provided' });
     }
 
-    console.log('✅ File received:', req.file.originalname, req.file.size, 'bytes');
+    console.log('✅ File received:', req.file.originalname);
+    console.log('   Size:', (req.file.size / (1024 * 1024)).toFixed(2), 'MB');
+    console.log('   MIME:', req.file.mimetype);
+    console.log('   Buffer length:', req.file.buffer?.length || 0);
 
     // Validate file type
     if (req.file.mimetype !== 'application/pdf') {
       return res.status(400).json({ message: 'Only PDF files are allowed' });
     }
 
-    // Validate file size (max 50MB for Cloudinary)
+    // Validate file size (max 50MB for Cloudinary free tier)
     const maxSize = 50 * 1024 * 1024;
     if (req.file.size > maxSize) {
       return res.status(400).json({ 
@@ -1637,39 +1664,80 @@ app.post('/api/notes/upload-pdf-cloudinary', uploadMemory.single('pdf'), async (
       });
     }
 
-    // Upload to Cloudinary
+    // Sanitize filename for Cloudinary public_id
+    const sanitizedName = req.file.originalname
+      .replace(/\.pdf$/i, '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .substring(0, 50);
+    const publicId = `${Date.now()}-${sanitizedName}`;
+    
+    console.log('📤 Uploading to Cloudinary...');
+    console.log('   Public ID:', publicId);
+
+    // Upload to Cloudinary using buffer
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          resource_type: 'raw',
+          resource_type: 'raw',  // MUST be 'raw' for PDFs
           folder: 'notemitra/pdfs',
-          public_id: `${Date.now()}-${req.file.originalname.replace(/\.pdf$/i, '')}`,
-          format: 'pdf'
+          public_id: publicId,
+          overwrite: true,
+          invalidate: true
         },
         (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
+          if (error) {
+            console.error('❌ Cloudinary API Error:', JSON.stringify(error, null, 2));
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
       );
+      
+      // Write buffer to stream
       uploadStream.end(req.file.buffer);
     });
 
-    console.log('✅ File uploaded to Cloudinary successfully');
-    console.log('🔗 URL:', result.secure_url);
+    console.log('✅ File uploaded to Cloudinary successfully!');
+    console.log('🔗 Secure URL:', result.secure_url);
     console.log('🆔 Public ID:', result.public_id);
+    console.log('📦 Bytes:', result.bytes);
 
     res.json({
+      success: true,
       message: 'File uploaded successfully',
       fileUrl: result.secure_url,
+      url: result.secure_url,
       fileId: result.public_id,
+      publicId: result.public_id,
       filename: req.file.originalname,
       size: req.file.size,
-      cloudinaryId: result.public_id
+      cloudinaryId: result.public_id,
+      cloudinaryUrl: result.secure_url
     });
 
   } catch (error) {
-    console.error('❌ Cloudinary upload error:', error);
-    res.status(500).json({ message: 'Error uploading file to Cloudinary', error: error.message });
+    console.error('❌ Cloudinary upload error:');
+    console.error('   Message:', error.message);
+    console.error('   Name:', error.name);
+    console.error('   HTTP Code:', error.http_code);
+    console.error('   Full error:', JSON.stringify(error, null, 2));
+    
+    // Provide more specific error messages
+    let userMessage = 'Error uploading file to Cloudinary';
+    if (error.message?.includes('Invalid API')) {
+      userMessage = 'Storage service authentication failed. Please contact administrator.';
+    } else if (error.http_code === 401) {
+      userMessage = 'Storage service authentication failed.';
+    } else if (error.http_code === 413) {
+      userMessage = 'File is too large for the storage service.';
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: userMessage, 
+      error: error.message 
+    });
   }
 });
 
