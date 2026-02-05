@@ -91,10 +91,10 @@ export default function UploadPage() {
         return;
       }
 
-      // Validate file size (max 100MB)
-      const maxSize = 100 * 1024 * 1024; // 100MB in bytes
+      // Validate file size (max 10MB for Cloudinary free tier)
+      const maxSize = 10 * 1024 * 1024; // 10MB in bytes
       if (file.size > maxSize) {
-        setError('File size must be less than 100MB');
+        setError(`File size must be less than 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB. Please compress your PDF using a tool like ilovepdf.com before uploading.`);
         return;
       }
 
