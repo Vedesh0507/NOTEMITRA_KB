@@ -230,7 +230,7 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
         <div className="text-center">
           <p className="text-gray-400 mb-4">PDF not available</p>
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(`/notes/${noteId}`)}
             className="text-blue-400 hover:text-blue-300 flex items-center gap-2 mx-auto"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -247,7 +247,7 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between z-50">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push(`/notes/${noteId}`)}
             className="flex items-center gap-2 text-gray-300 hover:text-white transition"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -312,15 +312,22 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           />
         </div>
 
-        {/* AI Chat Panel - Slides from right */}
+        {/* AI Chat Panel - Bottom sheet on mobile, side panel on desktop */}
         <div 
-          className={`fixed lg:relative inset-y-0 right-0 w-full sm:w-96 lg:w-[35%] bg-gray-800 border-l border-gray-700 flex flex-col transform transition-transform duration-300 ease-in-out z-40 ${
-            showChat ? 'translate-x-0' : 'translate-x-full lg:hidden'
-          }`}
-          style={{ top: '57px', height: 'calc(100vh - 57px)' }}
+          className={`fixed lg:relative right-0 bg-gray-800 border-l lg:border-l border-t lg:border-t-0 border-gray-700 flex flex-col transform transition-all duration-300 ease-in-out z-40 ${
+            showChat 
+              ? 'translate-y-0 lg:translate-x-0' 
+              : 'translate-y-full lg:translate-x-full lg:hidden'
+          } bottom-0 lg:bottom-auto lg:inset-y-0 w-full lg:w-[35%] h-[60vh] lg:h-auto rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none`}
+          style={{ top: 'auto', maxHeight: 'calc(100vh - 57px)' }}
         >
+          {/* Mobile drag handle */}
+          <div className="lg:hidden flex justify-center pt-2 pb-1">
+            <div className="w-10 h-1 bg-gray-600 rounded-full" />
+          </div>
+          
           {/* Chat Header */}
-          <div className="bg-gray-750 border-b border-gray-700 p-4 flex items-center justify-between">
+          <div className="bg-gray-750 border-b border-gray-700 p-4 pt-2 lg:pt-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-white" />
