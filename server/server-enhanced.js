@@ -55,8 +55,8 @@ const anthropic = new Anthropic({
 
 // Admin emails list
 const ADMIN_EMAILS = [
-  'pavanmanepalli521@gmail.com',
-  'mohangupta16@gmail.com'
+  'manepallipavanvedesh@mictech.edu.in',
+  'devatamohangupta@mictech.edu.in'
 ];
 
 // MongoDB Schemas (will be used if MongoDB is available)
