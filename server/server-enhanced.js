@@ -8,10 +8,14 @@ const session = require('express-session');
 const Anthropic = require('@anthropic-ai/sdk');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
+const { Resend } = require('resend');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Initialize Resend for emails
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Middleware
 app.use(cors({
@@ -723,6 +727,50 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
+    // Helper function to send reset email
+    const sendResetEmail = async (userEmail, resetUrl) => {
+      try {
+        if (process.env.RESEND_API_KEY) {
+          await resend.emails.send({
+            from: 'NoteMitra <onboarding@resend.dev>',
+            to: userEmail,
+            subject: 'Reset Your NoteMitra Password',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%); padding: 30px; text-align: center;">
+                  <h1 style="color: white; margin: 0;">NoteMitra</h1>
+                </div>
+                <div style="padding: 30px; background: #f9fafb;">
+                  <h2 style="color: #1f2937;">Reset Your Password</h2>
+                  <p style="color: #4b5563; font-size: 16px;">
+                    We received a request to reset your password. Click the button below to create a new password:
+                  </p>
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${resetUrl}" style="background: #3B82F6; color: white; padding: 14px 28px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                      Reset Password
+                    </a>
+                  </div>
+                  <p style="color: #6b7280; font-size: 14px;">
+                    This link will expire in 15 minutes. If you didn't request a password reset, you can safely ignore this email.
+                  </p>
+                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+                  <p style="color: #9ca3af; font-size: 12px; text-align: center;">
+                    © ${new Date().getFullYear()} NoteMitra - MIC College of Technology
+                  </p>
+                </div>
+              </div>
+            `
+          });
+          console.log('✅ Password reset email sent to:', userEmail);
+          return true;
+        }
+        return false;
+      } catch (emailError) {
+        console.error('❌ Failed to send email:', emailError);
+        return false;
+      }
+    };
+
     if (mongoose.connection.readyState === 1) {
       const user = await User.findOne({ email: normalizedEmail });
       
@@ -736,13 +784,20 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
         
         console.log('📧 Password reset requested for:', normalizedEmail);
-        console.log('🔗 Reset URL:', resetUrl);
         
-        // Return reset URL directly (since email is not configured)
-        return res.json({ 
-          message: 'Password reset link generated',
-          _dev_resetUrl: resetUrl 
-        });
+        // Try to send email
+        const emailSent = await sendResetEmail(normalizedEmail, resetUrl);
+        
+        if (emailSent) {
+          return res.json({ message: 'Password reset link sent to your email' });
+        } else {
+          // Fallback: return URL directly if email fails
+          console.log('🔗 Reset URL (email not configured):', resetUrl);
+          return res.json({ 
+            message: 'Password reset link generated',
+            _dev_resetUrl: resetUrl 
+          });
+        }
       }
     } else {
       // In-memory mode
@@ -755,12 +810,18 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         const resetUrl = `${frontendUrl}/auth/reset-password?token=${resetToken}`;
         
         console.log('📧 Password reset requested for:', normalizedEmail);
-        console.log('🔗 Reset URL:', resetUrl);
         
-        return res.json({ 
-          message: 'Password reset link generated',
-          _dev_resetUrl: resetUrl 
-        });
+        const emailSent = await sendResetEmail(normalizedEmail, resetUrl);
+        
+        if (emailSent) {
+          return res.json({ message: 'Password reset link sent to your email' });
+        } else {
+          console.log('🔗 Reset URL (email not configured):', resetUrl);
+          return res.json({ 
+            message: 'Password reset link generated',
+            _dev_resetUrl: resetUrl 
+          });
+        }
       }
     }
 
