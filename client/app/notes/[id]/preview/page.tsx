@@ -41,8 +41,8 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-// Use environment variable for API key (set in Vercel dashboard)
-const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+// Use environment variable for Groq API key (set in Vercel dashboard)
+const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
 
 export default function PDFPreviewPage() {
   const params = useParams();
@@ -142,71 +142,38 @@ export default function PDFPreviewPage() {
     setQueriesLeft(prev => prev - 1);
 
     try {
-      // Build context for Gemini
-      const context = note ? `
-        The user is viewing a PDF document titled "${note.title}" about ${note.subject}.
-        Subject: ${note.subject}
-        Semester: ${note.semester}
-        ${note.module ? `Module: ${note.module}` : ''}
-        ${note.description ? `Description: ${note.description}` : ''}
-        
-        Please help the user understand the content. If they ask about specific topics, 
-        explain them clearly as a helpful tutor would. Keep answers concise but informative.
-        If you don't know something specific about the document content, provide general 
-        educational information about the topic.
-      ` : '';
+      // Build context for Groq
+      const systemPrompt = note ? `You are a helpful AI study assistant. The user is viewing a PDF document titled "${note.title}" about ${note.subject}.
+Subject: ${note.subject}
+Semester: ${note.semester}
+${note.module ? `Module: ${note.module}` : ''}
+${note.description ? `Description: ${note.description}` : ''}
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: `${context}\n\nUser question: ${userMessage.content}\n\nProvide a helpful, educational response:`
-                  }
-                ]
-              }
-            ],
-            generationConfig: {
-              temperature: 0.7,
-              topK: 40,
-              topP: 0.95,
-              maxOutputTokens: 1024,
-            },
-            safetySettings: [
-              {
-                category: "HARM_CATEGORY_HARASSMENT",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE"
-              },
-              {
-                category: "HARM_CATEGORY_HATE_SPEECH",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE"
-              },
-              {
-                category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE"
-              },
-              {
-                category: "HARM_CATEGORY_DANGEROUS_CONTENT",
-                threshold: "BLOCK_MEDIUM_AND_ABOVE"
-              }
-            ]
-          })
-        }
-      );
+Help the user understand the content. Explain topics clearly as a helpful tutor would. Keep answers concise but informative. If you don't know something specific about the document content, provide general educational information about the topic.` : 'You are a helpful AI study assistant.';
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage.content }
+          ],
+          temperature: 0.7,
+          max_tokens: 1024,
+        })
+      });
 
       const data = await response.json();
       
       let assistantContent = "I'm sorry, I couldn't generate a response. Please try again.";
       
-      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
-        assistantContent = data.candidates[0].content.parts[0].text;
+      if (data.choices && data.choices[0]?.message?.content) {
+        assistantContent = data.choices[0].message.content;
       } else if (data.error) {
         assistantContent = `Error: ${data.error.message || 'API request failed'}`;
       }
