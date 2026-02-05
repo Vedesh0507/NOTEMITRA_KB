@@ -1967,68 +1967,95 @@ app.get('/api/notes/:noteId/download', async (req, res) => {
         });
       }
 
-      // Check if note has a fileId
-      if (!note.fileId) {
-        return res.status(404).json({ 
-          success: false,
-          message: 'No file associated with this note',
-          error: 'NO_FILE_ID',
-          noteId: noteIdParam
+      console.log('📄 Note found:', {
+        id: note._id,
+        title: note.title,
+        fileId: note.fileId,
+        cloudinaryId: note.cloudinaryId,
+        cloudinaryUrl: note.cloudinaryUrl,
+        fileUrl: note.fileUrl
+      });
+
+      // PRIORITY 1: Check for Cloudinary URL (newer uploads)
+      if (note.cloudinaryUrl || note.fileUrl) {
+        const downloadUrl = note.cloudinaryUrl || note.fileUrl;
+        console.log('☁️ Using Cloudinary URL for download:', downloadUrl);
+        
+        // Return JSON with download URL - frontend will handle it
+        return res.json({ 
+          success: true,
+          downloadUrl: downloadUrl,
+          fileName: note.fileName || `${note.title}.pdf`,
+          source: 'cloudinary'
         });
       }
 
-      // Convert fileId to ObjectId
-      const fileId = new mongoose.Types.ObjectId(note.fileId);
-      console.log('✅ Found note with fileId:', fileId.toString());
+      // PRIORITY 2: Check for GridFS fileId (older uploads)
+      if (note.fileId) {
+        console.log('📦 Using GridFS for download, fileId:', note.fileId);
+        
+        // Convert fileId to ObjectId
+        const fileId = new mongoose.Types.ObjectId(note.fileId);
+        console.log('✅ Found note with fileId:', fileId.toString());
 
-      // Find file in GridFS
-      const files = await gfs.files.findOne({ _id: fileId });
-      
-      if (!files) {
-        return res.status(404).json({ 
-          success: false,
-          message: 'File not found in storage',
-          error: 'FILE_NOT_FOUND',
-          fileId: fileId.toString()
-        });
-      }
-
-      console.log('✅ File found for download:', { 
-        noteId: noteIdParam,
-        fileId: files._id.toString(), 
-        filename: files.filename,
-        size: files.length
-      });
-
-      // Sanitize filename
-      const sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
-
-      // Set download headers
-      res.set({
-        'Content-Type': files.contentType || 'application/pdf',
-        'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
-        'Content-Length': files.length,
-        'Cache-Control': 'public, max-age=31536000',
-        'X-Note-Id': noteIdParam,
-        'X-File-Id': files._id.toString()
-      });
-
-      // Stream the file
-      const readstream = gridfsBucket.openDownloadStream(fileId);
-      
-      readstream.on('error', (error) => {
-        console.error('❌ Stream error:', error);
-        if (!res.headersSent) {
-          res.status(500).json({ 
+        // Find file in GridFS
+        const files = await gfs.files.findOne({ _id: fileId });
+        
+        if (!files) {
+          return res.status(404).json({ 
             success: false,
-            message: 'Error streaming file',
-            error: 'STREAM_ERROR',
-            details: error.message 
+            message: 'File not found in storage',
+            error: 'FILE_NOT_FOUND',
+            fileId: fileId.toString()
           });
         }
+
+        console.log('✅ File found for download:', { 
+          noteId: noteIdParam,
+          fileId: files._id.toString(), 
+          filename: files.filename,
+          size: files.length
+        });
+
+        // Sanitize filename
+        const sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+
+        // Set download headers
+        res.set({
+          'Content-Type': files.contentType || 'application/pdf',
+          'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
+          'Content-Length': files.length,
+          'Cache-Control': 'public, max-age=31536000',
+          'X-Note-Id': noteIdParam,
+          'X-File-Id': files._id.toString()
+        });
+
+        // Stream the file
+        const readstream = gridfsBucket.openDownloadStream(fileId);
+        
+        readstream.on('error', (error) => {
+          console.error('❌ Stream error:', error);
+          if (!res.headersSent) {
+            res.status(500).json({ 
+              success: false,
+              message: 'Error streaming file',
+              error: 'STREAM_ERROR',
+              details: error.message 
+            });
+          }
+        });
+
+        return readstream.pipe(res);
+      }
+
+      // No file found at all
+      return res.status(404).json({ 
+        success: false,
+        message: 'No file associated with this note',
+        error: 'NO_FILE',
+        noteId: noteIdParam
       });
 
-      readstream.pipe(res);
     } else {
       // In-memory version
       const noteIdNum = parseInt(noteIdParam);
