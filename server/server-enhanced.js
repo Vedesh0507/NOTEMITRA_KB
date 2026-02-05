@@ -248,8 +248,11 @@ async function connectMongoDB() {
     console.log('🔌 Connecting to MongoDB...');
     
     await mongoose.connect(mongoURI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 5000, // Reduced from 10s to 5s
+      socketTimeoutMS: 30000, // Reduced from 45s to 30s
+      connectTimeoutMS: 10000, // Connection timeout
+      maxPoolSize: 10, // Connection pool for faster reuse
+      minPoolSize: 2, // Keep minimum connections ready
     });
 
     console.log('✅ MongoDB connected successfully');
@@ -294,10 +297,10 @@ async function connectMongoDB() {
       console.error('❌ MongoDB connection error:', err.message);
     });
 
-    // Define Schemas
+    // Define Schemas with indexes for faster queries
     const userSchema = new mongoose.Schema({
       name: String,
-      email: { type: String, unique: true },
+      email: { type: String, unique: true, index: true },
       password: String,
       role: { type: String, default: 'student' },
       branch: String,
@@ -309,7 +312,7 @@ async function connectMongoDB() {
       totalViews: { type: Number, default: 0 },
       notesUploaded: { type: Number, default: 0 },
       reputation: { type: Number, default: 0 },
-      resetToken: String,
+      resetToken: { type: String, index: true },
       resetTokenExpiry: Date,
       createdAt: { type: Date, default: Date.now }
     });
@@ -317,10 +320,10 @@ async function connectMongoDB() {
     const noteSchema = new mongoose.Schema({
       title: String,
       description: String,
-      subject: String,
-      semester: String,
+      subject: { type: String, index: true },
+      semester: { type: String, index: true },
       module: String,
-      branch: String,
+      branch: { type: String, index: true },
       fileName: String,
       fileUrl: String,
       fileId: mongoose.Schema.Types.ObjectId, // GridFS file ID (legacy)
@@ -328,7 +331,7 @@ async function connectMongoDB() {
       cloudinaryUrl: String, // Cloudinary secure URL
       fileSize: Number,
       tags: String,
-      userId: mongoose.Schema.Types.ObjectId,
+      userId: { type: mongoose.Schema.Types.ObjectId, index: true },
       userName: String,
       views: { type: Number, default: 0 },
       downloads: { type: Number, default: 0 },
@@ -337,12 +340,12 @@ async function connectMongoDB() {
       isApproved: { type: Boolean, default: true },
       isReported: { type: Boolean, default: false },
       reportReason: String,
-      createdAt: { type: Date, default: Date.now }
+      createdAt: { type: Date, default: Date.now, index: true }
     });
 
     const savedNoteSchema = new mongoose.Schema({
-      userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-      noteId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Note' },
+      userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+      noteId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Note', index: true },
       savedAt: { type: Date, default: Date.now }
     });
 
@@ -475,13 +478,14 @@ app.post('/api/auth/signup', async (req, res) => {
     const isAdmin = ADMIN_EMAILS.includes(email);
 
     if (useMongoDB) {
-      // MongoDB version
-      const existingUser = await User.findOne({ email });
+      // MongoDB version - optimized with lean() and select() for faster check
+      const existingUser = await User.findOne({ email: email.toLowerCase().trim() }).select('_id').lean();
       if (existingUser) {
         return res.status(400).json({ message: 'User already exists with this email' });
       }
 
-      const user = new User({ 
+      // Use create() for slightly faster insert
+      const user = await User.create({ 
         name: name.trim(), 
         email: email.toLowerCase().trim(), 
         password, 
@@ -492,7 +496,6 @@ app.post('/api/auth/signup', async (req, res) => {
         isAdmin, 
         isSuspended: false 
       });
-      await user.save();
 
       const token = 'dev_token_' + user._id;
       res.status(201).json({
@@ -560,8 +563,10 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (useMongoDB) {
-      // MongoDB version - case-insensitive email search
-      const user = await User.findOne({ email: email.toLowerCase().trim() });
+      // MongoDB version - optimized with select() for faster query
+      const user = await User.findOne({ email: email.toLowerCase().trim() })
+        .select('_id name email password role branch section isAdmin isSuspended')
+        .lean();
       if (!user) {
         console.log('❌ Login failed: User not found for email:', email.toLowerCase().trim());
         return res.status(401).json({ message: 'Invalid email or password' });
@@ -722,21 +727,21 @@ app.get('/api/auth/me', async (req, res) => {
         return res.status(401).json({ message: 'Invalid user ID format in token' });
       }
 
-      const user = await User.findById(userId).select('-password').lean();
+      // Run all queries in parallel for faster response
+      const [user, notesCount, userNotes, savedNotesCount] = await Promise.all([
+        User.findById(userId).select('-password').lean(),
+        Note.countDocuments({ userId: userId }),
+        Note.find({ userId: userId }).select('views upvotes downloads').lean(),
+        SavedNote.countDocuments({ userId: userId })
+      ]);
+
       if (!user) {
         return res.status(404).json({ message: 'User not found. Your account may have been deleted' });
       }
 
-      // Get user's notes count
-      const notesCount = await Note.countDocuments({ userId: user._id });
-
-      // Get total views and upvotes from user's notes
-      const userNotes = await Note.find({ userId: user._id }).select('views upvotes downloads').lean();
+      // Calculate totals from user's notes
       const totalViews = userNotes.reduce((sum, note) => sum + (note.views || 0), 0);
       const totalUpvotes = userNotes.reduce((sum, note) => sum + (note.upvotes || 0), 0);
-
-      // Get saved notes count
-      const savedNotesCount = await SavedNote.countDocuments({ userId: user._id });
 
       res.json({
         user: { 
