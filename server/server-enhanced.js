@@ -68,6 +68,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Ensure all API responses have proper Content-Type header
+app.use('/api', (req, res, next) => {
+  // Set default Content-Type for API responses
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  next();
+});
+
 // Session configuration - use MongoStore if MONGODB_URI is available
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'notemitra-secret-key-change-in-production',
@@ -386,34 +393,24 @@ async function connectMongoDB() {
   }
 }
 
-// Health check
+// Health check - PUBLIC endpoint (no authentication required)
 app.get('/api/health', (req, res) => {
+  const startTime = Date.now();
+  
   try {
-    // Check if auth token is provided (optional for health check)
+    // Check if auth token is provided (optional - for info only, never reject)
     const authHeader = req.headers.authorization;
     let tokenValid = false;
     let tokenInfo = null;
     
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const token = authHeader.replace('Bearer ', '');
-      if (token.startsWith('dev_token_')) {
+      if (token.startsWith('dev_token_') && !token.includes('expired')) {
         const userId = token.replace('dev_token_', '');
-        // Check for expired token simulation (tokens with 'expired' in them)
-        if (token.includes('expired')) {
-          return res.status(401).json({ 
-            message: 'Token has expired. Please login again.',
-            error: 'TOKEN_EXPIRED'
-          });
-        }
         tokenValid = true;
         tokenInfo = { userId, valid: true };
-      } else if (token && token.length > 0) {
-        // Invalid token format provided
-        return res.status(401).json({ 
-          message: 'Invalid token format',
-          error: 'INVALID_TOKEN_FORMAT'
-        });
       }
+      // Note: We don't reject invalid tokens on health check - it's a public endpoint
     }
 
     // Check actual MongoDB connection state
@@ -427,37 +424,50 @@ app.get('/api/health', (req, res) => {
       process.env.CLOUDINARY_API_SECRET
     );
     
+    const responseTime = Date.now() - startTime;
+    
     const healthData = {
       status: 'ok',
       message: 'NoteMitra API is running',
-      authenticated: tokenValid,
-      tokenInfo: tokenInfo,
-      database: useMongoDB ? 'MongoDB' : 'In-Memory',
-      mongoConnected: mongoConnected,
-      uploadsEnabled: uploadsEnabled || cloudinaryConfigured,
-      cloudinaryEnabled: cloudinaryConfigured,
+      healthy: true,
       timestamp: new Date().toISOString(),
+      responseTimeMs: responseTime,
       uptime: Math.floor(process.uptime()),
       version: '1.0.0',
       environment: process.env.NODE_ENV || 'development',
+      authenticated: tokenValid,
+      tokenInfo: tokenInfo,
+      database: {
+        type: useMongoDB ? 'MongoDB' : 'In-Memory',
+        connected: mongoConnected,
+        status: mongoConnected ? 'connected' : (useMongoDB ? 'disconnected' : 'in-memory')
+      },
       services: {
         api: 'operational',
-        database: mongoConnected ? 'connected' : (useMongoDB ? 'disconnected' : 'in-memory'),
-        fileStorage: cloudinaryConfigured ? 'Cloudinary' : (uploadsEnabled ? 'GridFS' : 'disabled'),
-        uploads: (uploadsEnabled || cloudinaryConfigured) ? 'enabled' : 'disabled',
-        cloudinary: cloudinaryConfigured ? 'configured' : 'not configured'
+        database: mongoConnected ? 'operational' : (useMongoDB ? 'degraded' : 'in-memory'),
+        fileStorage: cloudinaryConfigured ? 'operational' : (uploadsEnabled ? 'operational' : 'disabled'),
+        uploads: (uploadsEnabled || cloudinaryConfigured) ? 'operational' : 'disabled'
+      },
+      storage: {
+        cloudinary: cloudinaryConfigured,
+        gridfs: uploadsEnabled,
+        enabled: uploadsEnabled || cloudinaryConfigured
       }
     };
     
-    // Set proper headers
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-cache');
+    // Set proper headers for Content-Type verification test
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('X-Response-Time', `${responseTime}ms`);
     res.status(200).json(healthData);
   } catch (error) {
     console.error('Health check error:', error);
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.status(503).json({
       status: 'error',
+      healthy: false,
       message: 'Service temporarily unavailable',
+      error: 'SERVICE_UNAVAILABLE',
       timestamp: new Date().toISOString()
     });
   }
@@ -3318,6 +3328,9 @@ async function startServer() {
 app.use((err, req, res, next) => {
   console.error('Global error handler:', err);
   
+  // Ensure Content-Type is set
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  
   // Handle multer errors
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
@@ -3358,9 +3371,24 @@ app.use((err, req, res, next) => {
   }
   
   // Default error response
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
   res.status(500).json({
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'production' ? 'SERVER_ERROR' : err.message
+  });
+});
+
+// 404 Handler - Must be after all routes but before error handler
+app.use((req, res) => {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.status(404).json({
+    status: 'error',
+    message: 'Endpoint not found',
+    error: 'NOT_FOUND',
+    path: req.originalUrl,
+    method: req.method,
+    timestamp: new Date().toISOString(),
+    suggestion: 'Check the API documentation for valid endpoints'
   });
 });
 
