@@ -41,7 +41,8 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const GEMINI_API_KEY = 'AIzaSyByrTE_NB1j2i6Eeqt9OGwOFDCjWqpPBBo';
+// Use environment variable for API key (set in Vercel dashboard)
+const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 
 export default function PDFPreviewPage() {
   const params = useParams();
