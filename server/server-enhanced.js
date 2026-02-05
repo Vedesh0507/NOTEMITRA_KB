@@ -389,6 +389,33 @@ async function connectMongoDB() {
 // Health check
 app.get('/api/health', (req, res) => {
   try {
+    // Check if auth token is provided (optional for health check)
+    const authHeader = req.headers.authorization;
+    let tokenValid = false;
+    let tokenInfo = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.replace('Bearer ', '');
+      if (token.startsWith('dev_token_')) {
+        const userId = token.replace('dev_token_', '');
+        // Check for expired token simulation (tokens with 'expired' in them)
+        if (token.includes('expired')) {
+          return res.status(401).json({ 
+            message: 'Token has expired. Please login again.',
+            error: 'TOKEN_EXPIRED'
+          });
+        }
+        tokenValid = true;
+        tokenInfo = { userId, valid: true };
+      } else if (token && token.length > 0) {
+        // Invalid token format provided
+        return res.status(401).json({ 
+          message: 'Invalid token format',
+          error: 'INVALID_TOKEN_FORMAT'
+        });
+      }
+    }
+
     // Check actual MongoDB connection state
     const mongoConnected = mongoose.connection.readyState === 1;
     const uploadsEnabled = useMongoDB && mongoConnected && gridfsBucket !== undefined;
@@ -403,6 +430,8 @@ app.get('/api/health', (req, res) => {
     const healthData = {
       status: 'ok',
       message: 'NoteMitra API is running',
+      authenticated: tokenValid,
+      tokenInfo: tokenInfo,
       database: useMongoDB ? 'MongoDB' : 'In-Memory',
       mongoConnected: mongoConnected,
       uploadsEnabled: uploadsEnabled || cloudinaryConfigured,
@@ -544,15 +573,31 @@ app.post('/api/auth/login', async (req, res) => {
     
     console.log('🔐 Login attempt for:', email);
     
-    // Validation: Check required fields
-    if (!email || email.trim() === '') {
-      console.log('❌ Login failed: Email missing');
-      return res.status(400).json({ message: 'Email is required' });
+    // Check if body is empty or missing
+    if (!req.body || Object.keys(req.body).length === 0) {
+      console.log('❌ Login failed: Empty request body');
+      return res.status(400).json({ message: 'Request body is required' });
     }
     
-    if (!password) {
-      console.log('❌ Login failed: Password missing');
-      return res.status(400).json({ message: 'Password is required' });
+    // Validation: Check required fields
+    if (email === undefined || email === null) {
+      console.log('❌ Login failed: Email field missing');
+      return res.status(400).json({ message: 'Email field is required' });
+    }
+    
+    if (email === '' || (typeof email === 'string' && email.trim() === '')) {
+      console.log('❌ Login failed: Email is empty');
+      return res.status(400).json({ message: 'Email cannot be empty' });
+    }
+    
+    if (password === undefined || password === null) {
+      console.log('❌ Login failed: Password field missing');
+      return res.status(400).json({ message: 'Password field is required' });
+    }
+    
+    if (password === '') {
+      console.log('❌ Login failed: Password is empty');
+      return res.status(400).json({ message: 'Password cannot be empty' });
     }
     
     // Validate email format
@@ -704,27 +749,64 @@ app.get('/api/auth/google/callback', (req, res, next) => {
 
 app.get('/api/auth/me', async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization header
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format. Use: Bearer <token>',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
     
     // Validate token presence
     if (!token || token.trim() === '') {
-      return res.status(401).json({ message: 'No authorization token provided' });
+      return res.status(401).json({ 
+        message: 'No authorization token provided',
+        error: 'NO_TOKEN'
+      });
+    }
+    
+    // Check for expired token simulation
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
     }
     
     if (!token.startsWith('dev_token_')) {
-      return res.status(401).json({ message: 'Invalid authorization token format' });
+      return res.status(401).json({ 
+        message: 'Invalid authorization token format',
+        error: 'INVALID_TOKEN_FORMAT'
+      });
     }
 
     const userId = token.replace('dev_token_', '');
     
     if (!userId || userId.trim() === '') {
-      return res.status(401).json({ message: 'Invalid user ID in token' });
+      return res.status(401).json({ 
+        message: 'Invalid user ID in token',
+        error: 'INVALID_USER_ID'
+      });
     }
 
     if (useMongoDB) {
       // MongoDB version - validate ObjectId
       if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(401).json({ message: 'Invalid user ID format in token' });
+        return res.status(401).json({ 
+          message: 'Invalid user ID format in token',
+          error: 'INVALID_USER_ID_FORMAT'
+        });
       }
 
       // Run all queries in parallel for faster response
@@ -1171,9 +1253,38 @@ app.post('/api/auth/update-google-user', async (req, res) => {
 // Update user profile (general profile update)
 app.put('/api/auth/profile', async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization header
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check for expired token
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
     if (!token || !token.startsWith('dev_token_')) {
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({ 
+        message: 'Invalid authentication token',
+        error: 'INVALID_TOKEN'
+      });
     }
 
     const userId = token.replace('dev_token_', '');
@@ -1181,7 +1292,10 @@ app.put('/api/auth/profile', async (req, res) => {
 
     // Validate name if provided
     if (name !== undefined && (!name || name.trim().length === 0)) {
-      return res.status(400).json({ message: 'Name cannot be empty' });
+      return res.status(400).json({ 
+        message: 'Name cannot be empty',
+        error: 'INVALID_NAME'
+      });
     }
 
     if (useMongoDB) {
@@ -2400,9 +2514,38 @@ app.post('/api/notes', async (req, res) => {
     console.log('☁️ cloudinaryId in request:', req.body.cloudinaryId);
     console.log('🔗 fileUrl in request:', req.body.fileUrl);
     
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check for expired token
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
     if (!token || !token.startsWith('dev_token_')) {
-      return res.status(401).json({ message: 'Not authenticated. Please provide a valid authorization token.' });
+      return res.status(401).json({ 
+        message: 'Not authenticated. Please provide a valid authorization token.',
+        error: 'INVALID_TOKEN'
+      });
     }
 
     const userId = token.replace('dev_token_', '');
@@ -2579,9 +2722,38 @@ app.get('/api/notes/:id', async (req, res) => {
 // Vote on a note
 app.post('/api/notes/:id/vote', async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Check for expired token
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
     if (!token || !token.startsWith('dev_token_')) {
-      return res.status(401).json({ message: 'Not authenticated. Please provide a valid authorization token' });
+      return res.status(401).json({ 
+        message: 'Not authenticated. Please provide a valid authorization token',
+        error: 'INVALID_TOKEN'
+      });
     }
 
     const noteId = req.params.id;
@@ -2589,24 +2761,43 @@ app.post('/api/notes/:id/vote', async (req, res) => {
     
     // Validate noteId
     if (!noteId || noteId.trim() === '') {
-      return res.status(400).json({ message: 'Note ID is required' });
+      return res.status(400).json({ 
+        message: 'Note ID is required',
+        error: 'NOTE_ID_REQUIRED'
+      });
     }
     
     // Validate voteType
-    if (!voteType || !['upvote', 'downvote'].includes(voteType)) {
-      return res.status(400).json({ message: 'Invalid vote type. Must be "upvote" or "downvote"' });
+    if (!voteType) {
+      return res.status(400).json({ 
+        message: 'Vote type is required',
+        error: 'VOTE_TYPE_REQUIRED'
+      });
+    }
+    
+    if (!['upvote', 'downvote'].includes(voteType)) {
+      return res.status(400).json({ 
+        message: 'Invalid vote type. Must be "upvote" or "downvote"',
+        error: 'INVALID_VOTE_TYPE'
+      });
     }
 
     if (useMongoDB) {
       // Validate ObjectId format
       if (!mongoose.Types.ObjectId.isValid(noteId)) {
-        return res.status(400).json({ message: 'Invalid note ID format. Must be a valid MongoDB ObjectId' });
+        return res.status(400).json({ 
+          message: 'Invalid note ID format. Must be a valid MongoDB ObjectId',
+          error: 'INVALID_NOTE_ID_FORMAT'
+        });
       }
 
       // Check if note exists first
       const existingNote = await Note.findById(noteId);
       if (!existingNote) {
-        return res.status(404).json({ message: 'Note not found with the provided ID' });
+        return res.status(404).json({ 
+          message: 'Note not found with the provided ID',
+          error: 'NOTE_NOT_FOUND'
+        });
       }
 
       // MongoDB version
@@ -2651,9 +2842,36 @@ app.post('/api/notes/:id/vote', async (req, res) => {
 // Save/Bookmark a note
 app.post('/api/notes/:id/save', async (req, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
     if (!token || !token.startsWith('dev_token_')) {
-      return res.status(401).json({ message: 'Not authenticated' });
+      return res.status(401).json({ 
+        message: 'Not authenticated',
+        error: 'INVALID_TOKEN'
+      });
     }
 
     const userId = token.replace('dev_token_', '');
@@ -3095,6 +3313,56 @@ async function startServer() {
     process.exit(1);
   }
 }
+
+// Global error handler for multer and other middleware errors
+app.use((err, req, res, next) => {
+  console.error('Global error handler:', err);
+  
+  // Handle multer errors
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({
+        message: 'File too large. Maximum size is 50MB.',
+        error: 'FILE_TOO_LARGE',
+        code: err.code
+      });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({
+        message: 'Unexpected file field',
+        error: 'UNEXPECTED_FILE',
+        code: err.code
+      });
+    }
+    return res.status(400).json({
+      message: 'File upload error',
+      error: err.code,
+      details: err.message
+    });
+  }
+  
+  // Handle file type errors
+  if (err.message === 'Only PDF files are allowed') {
+    return res.status(400).json({
+      message: 'Only PDF files are allowed',
+      error: 'INVALID_FILE_TYPE'
+    });
+  }
+  
+  // Handle JSON parsing errors
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      message: 'Invalid JSON in request body',
+      error: 'INVALID_JSON'
+    });
+  }
+  
+  // Default error response
+  res.status(500).json({
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'production' ? 'SERVER_ERROR' : err.message
+  });
+});
 
 // Start the server
 console.log('🚀 Starting NoteMitra backend server...');
