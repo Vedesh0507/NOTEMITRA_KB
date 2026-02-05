@@ -1660,11 +1660,12 @@ app.post('/api/notes/upload-pdf-cloudinary', uploadMemory.single('pdf'), async (
     const maxSize = 10 * 1024 * 1024; // 10MB limit for free tier
     if (req.file.size > maxSize) {
       console.log('❌ File too large:', (req.file.size / (1024 * 1024)).toFixed(2), 'MB');
-      return res.status(400).json({ 
-        message: `File size exceeds 10MB limit. Your file is ${(req.file.size / (1024 * 1024)).toFixed(2)}MB. Please compress your PDF before uploading.`,
+      return res.status(413).json({ 
+        message: `File too large. Cloudinary supports PDFs up to 10MB. Your file is ${(req.file.size / (1024 * 1024)).toFixed(2)}MB. Please compress your PDF at ilovepdf.com before uploading.`,
         error: 'FILE_TOO_LARGE',
         maxSize: '10MB',
-        yourSize: `${(req.file.size / (1024 * 1024)).toFixed(2)}MB`
+        yourSize: `${(req.file.size / (1024 * 1024)).toFixed(2)}MB`,
+        compressUrl: 'https://www.ilovepdf.com/compress_pdf'
       });
     }
 

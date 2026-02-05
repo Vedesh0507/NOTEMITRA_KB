@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database, Minimize2 } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database, ExternalLink } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
 import api from '@/lib/api';
 import { CURRICULUM, BRANCHES, SEMESTERS } from '@/lib/curriculum';
-import { compressPDF, needsCompression, formatFileSize, isUnderLimit, CompressionProgress } from '@/lib/pdfCompressor';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -23,11 +22,9 @@ export default function UploadPage() {
   const [uploadsEnabled, setUploadsEnabled] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
   
-  // Compression states
-  const [isCompressing, setIsCompressing] = useState(false);
-  const [compressionProgress, setCompressionProgress] = useState<string>('');
-  const [originalFileSize, setOriginalFileSize] = useState<number | null>(null);
-  const [wasCompressed, setWasCompressed] = useState(false);
+  // File size error state
+  const [fileTooLarge, setFileTooLarge] = useState(false);
+  const [oversizedFileInfo, setOversizedFileInfo] = useState<{ name: string; size: number } | null>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -87,12 +84,19 @@ export default function UploadPage() {
     );
   }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Format file size for display
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setError('');
-    setWasCompressed(false);
-    setOriginalFileSize(null);
-    setCompressionProgress('');
+    setFileTooLarge(false);
+    setOversizedFileInfo(null);
+    setSelectedFile(null);
 
     if (file) {
       // Validate file type
@@ -102,62 +106,24 @@ export default function UploadPage() {
       }
 
       const maxSize = 10 * 1024 * 1024; // 10MB in bytes
-      const maxAllowedSize = 50 * 1024 * 1024; // 50MB max for compression attempt
 
-      // Check if file is too large even for compression
-      if (file.size > maxAllowedSize) {
-        setError(`File is too large (${formatFileSize(file.size)}). Maximum file size for compression is 50MB. Please manually compress your PDF using ilovepdf.com before uploading.`);
+      // Check if file is too large
+      if (file.size > maxSize) {
+        setFileTooLarge(true);
+        setOversizedFileInfo({ name: file.name, size: file.size });
         return;
       }
 
-      // If file is over 10MB, try to compress it
-      if (file.size > maxSize) {
-        setOriginalFileSize(file.size);
-        setIsCompressing(true);
-        setCompressionProgress('Starting compression...');
-
-        try {
-          const result = await compressPDF(file, (progress) => {
-            setCompressionProgress(progress.message);
-          });
-
-          setIsCompressing(false);
-          setCompressionProgress('');
-
-          // Check if compression was successful
-          if (!isUnderLimit(result.file)) {
-            setError(
-              `Unable to compress PDF below 10MB. Original: ${formatFileSize(file.size)}, ` +
-              `After compression: ${formatFileSize(result.compressedSize)}. ` +
-              `Please manually compress using ilovepdf.com or smallpdf.com.`
-            );
-            return;
-          }
-
-          // Compression successful!
-          setSelectedFile(result.file);
-          setWasCompressed(true);
-          console.log(`✅ PDF compressed successfully: ${formatFileSize(file.size)} → ${formatFileSize(result.compressedSize)}`);
-          
-        } catch (compressError: any) {
-          setIsCompressing(false);
-          setCompressionProgress('');
-          setError(compressError.message || 'Failed to compress PDF. Please try compressing manually.');
-          return;
-        }
-      } else {
-        // File is already under 10MB, use as-is
-        setSelectedFile(file);
-      }
+      // File is under 10MB, accept it
+      setSelectedFile(file);
     }
   };
 
   const removeFile = () => {
     setSelectedFile(null);
     setError('');
-    setWasCompressed(false);
-    setOriginalFileSize(null);
-    setCompressionProgress('');
+    setFileTooLarge(false);
+    setOversizedFileInfo(null);
   };
 
   const generateAIDescription = async () => {
@@ -413,18 +379,45 @@ export default function UploadPage() {
                 PDF File *
               </label>
               
-              {/* Compression Progress */}
-              {isCompressing && (
-                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
-                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-                  <div>
-                    <h3 className="font-semibold text-blue-900">Compressing PDF...</h3>
-                    <p className="text-blue-700 text-sm">{compressionProgress || 'Please wait...'}</p>
+              {/* File Too Large Error Banner */}
+              {fileTooLarge && oversizedFileInfo && (
+                <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-orange-900">File Too Large</h3>
+                      <p className="text-orange-700 text-sm mt-1">
+                        <strong>{oversizedFileInfo.name}</strong> is {formatFileSize(oversizedFileInfo.size)}.
+                        Cloudinary free tier only supports PDFs up to <strong>10MB</strong>.
+                      </p>
+                      <p className="text-orange-600 text-sm mt-2">
+                        Please compress your PDF using a free online tool, then try uploading again.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <a
+                          href="https://www.ilovepdf.com/compress_pdf"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Compress PDF (iLovePDF)
+                        </a>
+                        <button
+                          type="button"
+                          onClick={removeFile}
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                        >
+                          <X className="w-4 h-4" />
+                          Clear Selection
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
               
-              {!selectedFile && !isCompressing ? (
+              {!selectedFile && !fileTooLarge ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
@@ -442,19 +435,19 @@ export default function UploadPage() {
                       Click to upload PDF
                     </span>
                     <span className="text-gray-500 text-sm">
-                      Up to 50MB (auto-compressed if over 10MB)
+                      Maximum file size: 10MB
                     </span>
                   </label>
                 </div>
               ) : selectedFile ? (
-                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                <div className="border border-green-300 rounded-lg p-4 bg-green-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <FileText className="w-8 h-8 text-blue-600" />
+                      <FileText className="w-8 h-8 text-green-600" />
                       <div>
                         <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatFileSize(selectedFile.size)}
+                        <p className="text-sm text-green-600">
+                          {formatFileSize(selectedFile.size)} ✓ Ready to upload
                         </p>
                       </div>
                     </div>
@@ -466,19 +459,6 @@ export default function UploadPage() {
                       <X className="w-5 h-5" />
                     </button>
                   </div>
-                  
-                  {/* Compression Success Badge */}
-                  {wasCompressed && originalFileSize && (
-                    <div className="mt-3 flex items-center gap-2 text-sm bg-green-100 text-green-800 px-3 py-2 rounded-lg">
-                      <Minimize2 className="w-4 h-4" />
-                      <span>
-                        <strong>Compressed!</strong> {formatFileSize(originalFileSize)} → {formatFileSize(selectedFile.size)} 
-                        <span className="text-green-600 ml-1">
-                          (saved {formatFileSize(originalFileSize - selectedFile.size)})
-                        </span>
-                      </span>
-                    </div>
-                  )}
                 </div>
               ) : null}
             </div>
@@ -672,8 +652,8 @@ export default function UploadPage() {
             </Button>
             <Button 
               type="submit" 
-              disabled={uploading || !selectedFile || uploadsEnabled === false}
-              title={uploadsEnabled === false ? 'Uploads are temporarily unavailable' : undefined}
+              disabled={uploading || !selectedFile || uploadsEnabled === false || fileTooLarge}
+              title={uploadsEnabled === false ? 'Uploads are temporarily unavailable' : fileTooLarge ? 'Please compress your PDF first' : undefined}
             >
               {uploading ? (
                 <>
