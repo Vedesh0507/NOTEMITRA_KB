@@ -21,19 +21,18 @@ const PORT = process.env.PORT || 5000;
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Initialize Gmail transporter for sending emails
+// Using port 465 with SSL which works better on cloud servers
 const gmailTransporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true, // Use SSL
   auth: {
     user: process.env.GMAIL_USER || 'notemitravg@gmail.com',
-    pass: process.env.GMAIL_APP_PASSWORD // App password from Google Account
+    pass: process.env.GMAIL_APP_PASSWORD
   },
-  // Connection settings for faster email delivery
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-  connectionTimeout: 10000, // 10 seconds
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 60000,
+  greetingTimeout: 30000,
+  socketTimeout: 60000
 });
 
 // Configure Cloudinary
