@@ -103,7 +103,7 @@ const ADMIN_EMAILS = [
 ];
 
 // MongoDB Schemas (will be used if MongoDB is available)
-let User, Note, SavedNote;
+let User, Note, SavedNote, Comment;
 
 // Passport serialization
 passport.serializeUser((user, done) => {
@@ -333,9 +333,19 @@ async function connectMongoDB() {
     // Compound index to prevent duplicate saves
     savedNoteSchema.index({ userId: 1, noteId: 1 }, { unique: true });
 
+    // Comment schema for note comments
+    const commentSchema = new mongoose.Schema({
+      noteId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Note', index: true },
+      userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
+      userName: { type: String, required: true },
+      text: { type: String, required: true, maxlength: 1000 },
+      createdAt: { type: Date, default: Date.now }
+    });
+
     User = mongoose.model('User', userSchema);
     Note = mongoose.model('Note', noteSchema);
     SavedNote = mongoose.model('SavedNote', savedNoteSchema);
+    Comment = mongoose.model('Comment', commentSchema);
 
     return true;
   } catch (error) {
@@ -2544,6 +2554,132 @@ app.get('/api/notes/:id/saved', async (req, res) => {
   } catch (error) {
     console.error('Check saved error:', error);
     res.json({ saved: false });
+  }
+});
+
+// ==================== COMMENTS API ====================
+
+// Get comments for a note
+app.get('/api/notes/:id/comments', async (req, res) => {
+  try {
+    const noteId = req.params.id;
+
+    if (!useMongoDB) {
+      return res.json({ comments: [] });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(noteId)) {
+      return res.status(400).json({ message: 'Invalid note ID' });
+    }
+
+    const comments = await Comment.find({ noteId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json({ comments });
+  } catch (error) {
+    console.error('Get comments error:', error);
+    res.status(500).json({ message: 'Failed to fetch comments' });
+  }
+});
+
+// Add a comment to a note
+app.post('/api/notes/:id/comments', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !token.startsWith('dev_token_')) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = token.replace('dev_token_', '');
+    const noteId = req.params.id;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: 'Comment text is required' });
+    }
+
+    if (text.length > 1000) {
+      return res.status(400).json({ message: 'Comment too long (max 1000 characters)' });
+    }
+
+    if (!useMongoDB) {
+      return res.status(503).json({ message: 'Database not available' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(noteId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    // Get user info
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Create and save comment
+    const comment = new Comment({
+      noteId,
+      userId,
+      userName: user.name,
+      text: text.trim()
+    });
+
+    await comment.save();
+
+    res.status(201).json({ 
+      message: 'Comment added',
+      comment: {
+        _id: comment._id,
+        noteId: comment.noteId,
+        userId: comment.userId,
+        userName: comment.userName,
+        text: comment.text,
+        createdAt: comment.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Add comment error:', error);
+    res.status(500).json({ message: 'Failed to add comment' });
+  }
+});
+
+// Delete a comment (only comment owner or admin)
+app.delete('/api/comments/:commentId', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token || !token.startsWith('dev_token_')) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+
+    const userId = token.replace('dev_token_', '');
+    const commentId = req.params.commentId;
+
+    if (!useMongoDB) {
+      return res.status(503).json({ message: 'Database not available' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(commentId) || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid ID format' });
+    }
+
+    const comment = await Comment.findById(commentId);
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' });
+    }
+
+    // Check if user owns the comment or is admin
+    const user = await User.findById(userId);
+    if (comment.userId.toString() !== userId && !user?.isAdmin) {
+      return res.status(403).json({ message: 'Not authorized to delete this comment' });
+    }
+
+    await Comment.findByIdAndDelete(commentId);
+
+    res.json({ message: 'Comment deleted' });
+  } catch (error) {
+    console.error('Delete comment error:', error);
+    res.status(500).json({ message: 'Failed to delete comment' });
   }
 });
 

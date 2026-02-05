@@ -47,10 +47,10 @@ interface Note {
 }
 
 interface Comment {
-  id: number;
+  _id: string;
   text: string;
   userName: string;
-  userId: number;
+  userId: string;
   createdAt: string;
 }
 
@@ -114,24 +114,14 @@ export default function NoteDetailPage() {
       
       setNote(fetchedNote);
 
-      // Fetch comments (will implement backend endpoint)
-      // For now, use mock data
-      setComments([
-        {
-          id: 1,
-          text: 'Great notes! Very helpful for exam preparation.',
-          userName: 'Student 1',
-          userId: 2,
-          createdAt: new Date().toISOString()
-        },
-        {
-          id: 2,
-          text: 'Clear explanations and well organized.',
-          userName: 'Student 2',
-          userId: 3,
-          createdAt: new Date().toISOString()
-        }
-      ]);
+      // Fetch real comments from the backend
+      try {
+        const commentsResponse = await notesAPI.getComments(noteId);
+        setComments(commentsResponse.data.comments || []);
+      } catch (err) {
+        console.error('Failed to fetch comments:', err);
+        setComments([]);
+      }
     } catch (error) {
       console.error('Failed to fetch note:', error);
     } finally {
@@ -453,22 +443,18 @@ export default function NoteDetailPage() {
     try {
       setSubmittingComment(true);
 
-      // Add comment locally
-      const newComment: Comment = {
-        id: comments.length + 1,
-        text: commentText,
-        userName: user.name,
-        userId: parseInt(user.id),
-        createdAt: new Date().toISOString()
-      };
-
-      setComments([newComment, ...comments]);
+      // Submit comment to backend
+      const response = await notesAPI.addComment(noteId, commentText.trim());
+      
+      // Add the new comment from server response to the list
+      if (response.data.comment) {
+        setComments([response.data.comment, ...comments]);
+      }
+      
       setCommentText('');
-
-      // Call API (will implement)
-      // await notesAPI.addComment(noteId, commentText);
     } catch (error) {
       console.error('Failed to submit comment:', error);
+      alert('Failed to post comment. Please try again.');
     } finally {
       setSubmittingComment(false);
     }
@@ -717,7 +703,7 @@ export default function NoteDetailPage() {
             ) : (
               comments.map((comment) => (
                 <div
-                  key={comment.id}
+                  key={comment._id}
                   className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
                 >
                   <div className="flex items-start justify-between mb-2">
@@ -729,12 +715,23 @@ export default function NoteDetailPage() {
                       </span>
                     </div>
                     
-                    {user && parseInt(user.id) === comment.userId && (
+                    {user && user.id === comment.userId && (
                       <div className="flex items-center gap-2">
                         <button className="text-gray-400 hover:text-blue-600">
                           <Edit className="w-4 h-4" />
                         </button>
-                        <button className="text-gray-400 hover:text-red-600">
+                        <button 
+                          className="text-gray-400 hover:text-red-600"
+                          onClick={async () => {
+                            try {
+                              await notesAPI.deleteComment(comment._id);
+                              setComments(comments.filter(c => c._id !== comment._id));
+                            } catch (err) {
+                              console.error('Failed to delete comment:', err);
+                              alert('Failed to delete comment');
+                            }
+                          }}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
