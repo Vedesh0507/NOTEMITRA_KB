@@ -214,7 +214,6 @@ export default function NoteDetailPage() {
       
       // Use API base URL which already includes /api
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
       const downloadUrl = `${apiBase}/notes/${noteIdString}/download`;
       
       console.log('📡 Fetching from:', downloadUrl);
@@ -362,25 +361,9 @@ export default function NoteDetailPage() {
   const handlePreview = () => {
     if (!note) return;
     
-    // PRIORITY 1: Use Cloudinary URL directly if available
-    if (note.cloudinaryUrl || note.fileUrl) {
-      const previewUrl = note.cloudinaryUrl || note.fileUrl;
-      console.log('👁️ Opening Cloudinary preview:', previewUrl);
-      window.open(previewUrl, '_blank');
-      return;
-    }
-    
-    // PRIORITY 2: Use GridFS fileId
-    if (note.fileId) {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const previewUrl = `${apiBase}/notes/view-pdf/${note.fileId}`;
-      console.log('👁️ Opening GridFS preview:', previewUrl);
-      window.open(previewUrl, '_blank');
-      return;
-    }
-    
-    // No file available
-    alert('No file available for preview');
+    // Navigate to the in-app preview page
+    const noteIdToUse = note._id || note.id || noteId;
+    router.push(`/notes/${noteIdToUse}/preview`);
   };
 
   const handleVote = async (voteType: 'up' | 'down') => {
