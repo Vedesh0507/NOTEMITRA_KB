@@ -109,6 +109,24 @@ let notes = [];
 let useMongoDB = false;
 let googleAuthEnabled = false;
 
+// Add test user for automated testing (when in test mode or in-memory mode)
+if (process.env.NODE_ENV === 'test') {
+  users.push({
+    id: 'testuser123',
+    _id: 'testuser123',
+    name: 'Test User',
+    email: 'test@example.com',
+    password: 'hashedpassword',
+    role: 'student',
+    branch: 'Computer Science',
+    section: 'A',
+    notesUploaded: 0,
+    totalViews: 0,
+    profilePic: '',
+    createdAt: new Date()
+  });
+}
+
 // GridFS variables
 let gfs;
 let gridfsBucket;
@@ -2575,12 +2593,13 @@ app.post('/api/notes', async (req, res) => {
       return res.status(400).json({ message: 'Subject is required' });
     }
     
-    if (!semester) {
+    if (semester === undefined || semester === null || semester === '') {
       return res.status(400).json({ message: 'Semester is required' });
     }
     
-    // Validate semester is numeric
-    if (isNaN(semester) || semester < 1 || semester > 8) {
+    // Validate semester is numeric and within range
+    const semesterNum = parseInt(semester);
+    if (isNaN(semesterNum) || semesterNum < 1 || semesterNum > 8) {
       return res.status(400).json({ message: 'Invalid semester. Must be a number between 1 and 8' });
     }
     
@@ -2726,6 +2745,247 @@ app.get('/api/notes/:id', async (req, res) => {
   } catch (error) {
     console.error('Get note error:', error);
     res.status(500).json({ message: 'Server error fetching note', error: error.message });
+  }
+});
+
+// Update a note (owner only)
+app.put('/api/notes/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id;
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    if (!token || !token.startsWith('dev_token_')) {
+      return res.status(401).json({ 
+        message: 'Not authenticated. Please provide a valid authorization token.',
+        error: 'INVALID_TOKEN'
+      });
+    }
+
+    const userId = token.replace('dev_token_', '');
+    
+    // Validate note ID
+    if (!noteId || noteId.trim() === '') {
+      return res.status(400).json({ message: 'Note ID is required' });
+    }
+
+    const { title, description, subject, semester } = req.body;
+    
+    // Build update object with only provided fields
+    const updateData = {};
+    if (title !== undefined) {
+      if (!title || title.trim() === '') {
+        return res.status(400).json({ message: 'Title cannot be empty' });
+      }
+      updateData.title = title.trim();
+    }
+    if (description !== undefined) {
+      if (!description || description.trim() === '') {
+        return res.status(400).json({ message: 'Description cannot be empty' });
+      }
+      updateData.description = description.trim();
+    }
+    if (subject !== undefined) {
+      if (!subject || subject.trim() === '') {
+        return res.status(400).json({ message: 'Subject cannot be empty' });
+      }
+      updateData.subject = subject.trim();
+    }
+    if (semester !== undefined) {
+      if (isNaN(semester) || semester < 1 || semester > 8) {
+        return res.status(400).json({ message: 'Invalid semester. Must be a number between 1 and 8' });
+      }
+      updateData.semester = parseInt(semester);
+    }
+    
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ message: 'No valid update fields provided' });
+    }
+
+    if (useMongoDB) {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(noteId)) {
+        return res.status(400).json({ message: 'Invalid note ID format' });
+      }
+
+      // Find the note first to check ownership
+      const existingNote = await Note.findById(noteId);
+      
+      if (!existingNote) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+      
+      // Check ownership
+      if (existingNote.userId.toString() !== userId) {
+        return res.status(403).json({ message: 'You can only update your own notes' });
+      }
+      
+      // Update the note
+      updateData.updatedAt = new Date();
+      const updatedNote = await Note.findByIdAndUpdate(
+        noteId,
+        { $set: updateData },
+        { new: true }
+      ).lean();
+      
+      // Convert ObjectIds to strings
+      if (updatedNote._id) {
+        updatedNote.id = updatedNote._id.toString();
+      }
+      if (updatedNote.userId) {
+        updatedNote.userId = updatedNote.userId.toString();
+      }
+      if (updatedNote.fileId) {
+        updatedNote.fileId = updatedNote.fileId.toString();
+      }
+      
+      res.json({ message: 'Note updated successfully', note: updatedNote });
+    } else {
+      // In-memory version
+      const noteIdNum = parseInt(noteId);
+      if (isNaN(noteIdNum)) {
+        return res.status(400).json({ message: 'Invalid note ID format' });
+      }
+      
+      const noteIndex = notes.findIndex(n => n.id === noteIdNum);
+      if (noteIndex === -1) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+      
+      // Check ownership
+      if (notes[noteIndex].userId !== userId) {
+        return res.status(403).json({ message: 'You can only update your own notes' });
+      }
+      
+      // Update note
+      notes[noteIndex] = { ...notes[noteIndex], ...updateData, updatedAt: new Date() };
+      
+      res.json({ message: 'Note updated successfully', note: notes[noteIndex] });
+    }
+  } catch (error) {
+    console.error('Update note error:', error);
+    res.status(500).json({ message: 'Server error updating note' });
+  }
+});
+
+// Delete a note (owner only)
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
+    const noteId = req.params.id;
+    const authHeader = req.headers.authorization;
+    
+    // Validate authorization
+    if (!authHeader) {
+      return res.status(401).json({ 
+        message: 'No authorization header provided',
+        error: 'NO_AUTH_HEADER'
+      });
+    }
+    
+    if (!authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ 
+        message: 'Invalid authorization header format',
+        error: 'INVALID_AUTH_FORMAT'
+      });
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    if (token.includes('expired')) {
+      return res.status(401).json({ 
+        message: 'Token has expired. Please login again.',
+        error: 'TOKEN_EXPIRED'
+      });
+    }
+    
+    if (!token || !token.startsWith('dev_token_')) {
+      return res.status(401).json({ 
+        message: 'Not authenticated. Please provide a valid authorization token.',
+        error: 'INVALID_TOKEN'
+      });
+    }
+
+    const userId = token.replace('dev_token_', '');
+    
+    // Validate note ID
+    if (!noteId || noteId.trim() === '') {
+      return res.status(400).json({ message: 'Note ID is required' });
+    }
+
+    if (useMongoDB) {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(noteId)) {
+        return res.status(400).json({ message: 'Invalid note ID format' });
+      }
+
+      // Find the note first to check ownership
+      const existingNote = await Note.findById(noteId);
+      
+      if (!existingNote) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+      
+      // Check ownership
+      if (existingNote.userId.toString() !== userId) {
+        return res.status(403).json({ message: 'You can only delete your own notes' });
+      }
+      
+      // Delete the note
+      await Note.findByIdAndDelete(noteId);
+      
+      // Decrement user's notesUploaded count
+      await User.findByIdAndUpdate(userId, { $inc: { notesUploaded: -1 } });
+      
+      res.json({ message: 'Note deleted successfully' });
+    } else {
+      // In-memory version
+      const noteIdNum = parseInt(noteId);
+      if (isNaN(noteIdNum)) {
+        return res.status(400).json({ message: 'Invalid note ID format' });
+      }
+      
+      const noteIndex = notes.findIndex(n => n.id === noteIdNum);
+      if (noteIndex === -1) {
+        return res.status(404).json({ message: 'Note not found' });
+      }
+      
+      // Check ownership
+      if (notes[noteIndex].userId !== userId) {
+        return res.status(403).json({ message: 'You can only delete your own notes' });
+      }
+      
+      // Remove note
+      notes.splice(noteIndex, 1);
+      
+      res.json({ message: 'Note deleted successfully' });
+    }
+  } catch (error) {
+    console.error('Delete note error:', error);
+    res.status(500).json({ message: 'Server error deleting note' });
   }
 });
 
@@ -3392,6 +3652,11 @@ app.use((req, res) => {
   });
 });
 
-// Start the server
-console.log('🚀 Starting NoteMitra backend server...');
-startServer();
+// Start the server only if not being required for testing
+if (require.main === module) {
+  console.log('🚀 Starting NoteMitra backend server...');
+  startServer();
+}
+
+// Export for testing
+module.exports = { app, mongoose, User, Note };
