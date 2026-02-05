@@ -52,6 +52,7 @@ export default function PDFPreviewPage() {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
   
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -100,14 +101,22 @@ export default function PDFPreviewPage() {
         }
         setNote(fetchedNote);
         
-        // Set PDF URL
+        // Set PDF URL - Use Google Docs Viewer for reliable inline display
+        let rawPdfUrl = '';
         if (fetchedNote.cloudinaryUrl) {
-          setPdfUrl(fetchedNote.cloudinaryUrl);
+          rawPdfUrl = fetchedNote.cloudinaryUrl;
         } else if (fetchedNote.fileUrl) {
-          setPdfUrl(fetchedNote.fileUrl);
+          rawPdfUrl = fetchedNote.fileUrl;
         } else if (fetchedNote.fileId) {
           const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-          setPdfUrl(`${apiBase}/notes/view-pdf/${fetchedNote.fileId}`);
+          rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
+        }
+        
+        if (rawPdfUrl) {
+          // Store original URL for downloads
+          setOriginalPdfUrl(rawPdfUrl);
+          // Use Google Docs Viewer for reliable PDF display
+          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
         }
       }
     } catch (error) {
@@ -148,7 +157,7 @@ export default function PDFPreviewPage() {
       ` : '';
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: {
@@ -232,8 +241,8 @@ export default function PDFPreviewPage() {
   };
 
   const handleDownload = () => {
-    if (pdfUrl) {
-      window.open(pdfUrl, '_blank');
+    if (originalPdfUrl) {
+      window.open(originalPdfUrl, '_blank');
     }
   };
 
@@ -327,11 +336,12 @@ export default function PDFPreviewPage() {
             showChat ? 'lg:w-[65%]' : 'w-full'
           }`}
         >
-          {/* PDF Embed using iframe */}
+          {/* PDF Embed using Google Docs Viewer */}
           <iframe
-            src={`${pdfUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+            src={pdfUrl}
             className="w-full h-full border-0"
             title={note.title}
+            allow="autoplay"
           />
         </div>
 
