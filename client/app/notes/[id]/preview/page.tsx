@@ -305,39 +305,13 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
             showChat ? 'lg:w-[65%]' : 'w-full'
           }`}
         >
-          {/* Desktop: Google Docs Viewer iframe */}
+          {/* Google Docs Viewer iframe - works on all devices */}
           <iframe
             src={pdfUrl}
-            className="hidden md:block w-full h-full border-0"
+            className="w-full h-full border-0"
             title={note.title}
             allow="autoplay"
           />
-          
-          {/* Mobile: Direct PDF view with fallback button */}
-          <div className="md:hidden w-full h-full flex flex-col">
-            {/* Try to show PDF directly first */}
-            <object
-              data={originalPdfUrl || ''}
-              type="application/pdf"
-              className="w-full flex-1 min-h-0"
-            >
-              {/* Fallback if object doesn't work */}
-              <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800 p-6 text-center">
-                <FileText className="w-16 h-16 text-blue-400 mb-4" />
-                <h3 className="text-white text-lg font-semibold mb-2">{note.title}</h3>
-                <p className="text-gray-400 text-sm mb-6">PDF preview may not be supported on this device</p>
-                <a
-                  href={originalPdfUrl || ''}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                  Open PDF in Browser
-                </a>
-              </div>
-            </object>
-          </div>
         </div>
 
         {/* AI Chat Panel - Bottom sheet on mobile, side panel on desktop */}
