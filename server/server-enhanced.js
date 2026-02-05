@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const Anthropic = require('@anthropic-ai/sdk');
 const multer = require('multer');
 const Grid = require('gridfs-stream');
@@ -50,15 +51,32 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
-app.use(session({
+
+// Session configuration - use MongoStore if MONGODB_URI is available
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'notemitra-secret-key-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // set to true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
-}));
+};
+
+// Add MongoStore for production to avoid MemoryStore warning
+if (process.env.MONGODB_URI && !process.env.MONGODB_URI.includes('username:password')) {
+  sessionConfig.store = MongoStore.create({
+    mongoUrl: process.env.MONGODB_URI,
+    ttl: 24 * 60 * 60, // Session TTL in seconds (24 hours)
+    autoRemove: 'native', // Use MongoDB's TTL index for cleanup
+    touchAfter: 24 * 3600 // Only update session once per 24 hours unless data changes
+  });
+  console.log('✅ Session store: MongoDB (production-ready)');
+} else {
+  console.log('⚠️  Session store: MemoryStore (development only)');
+}
+
+app.use(session(sessionConfig));
 app.use(passport.initialize());
 app.use(passport.session());
 
