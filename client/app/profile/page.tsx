@@ -289,7 +289,7 @@ export default function ProfilePage() {
                   ))}
                 </div>
               )
-            ) : (
+            ) : savedNotes.length === 0 ? (
               <div className="text-center py-12">
                 <BookmarkPlus className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No saved notes yet</h3>
@@ -297,6 +297,44 @@ export default function ProfilePage() {
                 <Button onClick={() => router.push('/browse')}>
                   Browse Notes
                 </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {savedNotes.map((note: any) => (
+                  <div
+                    key={note._id || note.id}
+                    onClick={() => router.push(`/notes/${note._id || note.id}`)}
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                  >
+                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
+                      {note.title}
+                    </h3>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {note.subject}
+                      </span>
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                        Sem {note.semester}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-gray-600">
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1">
+                          <Eye className="w-4 h-4" />
+                          {note.views || 0}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Download className="w-4 h-4" />
+                          {note.downloads || 0}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <ThumbsUp className="w-4 h-4" />
+                          {note.upvotes || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
