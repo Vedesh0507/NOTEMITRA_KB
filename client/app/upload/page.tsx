@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database } from 'lucide-react';
+import { Upload, FileText, X, CheckCircle, AlertCircle, Sparkles, Loader2, Database, Minimize2 } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
 import api from '@/lib/api';
 import { CURRICULUM, BRANCHES, SEMESTERS } from '@/lib/curriculum';
+import { compressPDF, needsCompression, formatFileSize, isUnderLimit, CompressionProgress } from '@/lib/pdfCompressor';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -21,6 +22,12 @@ export default function UploadPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadsEnabled, setUploadsEnabled] = useState<boolean | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
+  
+  // Compression states
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [compressionProgress, setCompressionProgress] = useState<string>('');
+  const [originalFileSize, setOriginalFileSize] = useState<number | null>(null);
+  const [wasCompressed, setWasCompressed] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -80,9 +87,12 @@ export default function UploadPage() {
     );
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setError('');
+    setWasCompressed(false);
+    setOriginalFileSize(null);
+    setCompressionProgress('');
 
     if (file) {
       // Validate file type
@@ -91,20 +101,63 @@ export default function UploadPage() {
         return;
       }
 
-      // Validate file size (max 10MB for Cloudinary free tier)
       const maxSize = 10 * 1024 * 1024; // 10MB in bytes
-      if (file.size > maxSize) {
-        setError(`File size must be less than 10MB. Your file is ${(file.size / (1024 * 1024)).toFixed(2)}MB. Please compress your PDF using a tool like ilovepdf.com before uploading.`);
+      const maxAllowedSize = 50 * 1024 * 1024; // 50MB max for compression attempt
+
+      // Check if file is too large even for compression
+      if (file.size > maxAllowedSize) {
+        setError(`File is too large (${formatFileSize(file.size)}). Maximum file size for compression is 50MB. Please manually compress your PDF using ilovepdf.com before uploading.`);
         return;
       }
 
-      setSelectedFile(file);
+      // If file is over 10MB, try to compress it
+      if (file.size > maxSize) {
+        setOriginalFileSize(file.size);
+        setIsCompressing(true);
+        setCompressionProgress('Starting compression...');
+
+        try {
+          const result = await compressPDF(file, (progress) => {
+            setCompressionProgress(progress.message);
+          });
+
+          setIsCompressing(false);
+          setCompressionProgress('');
+
+          // Check if compression was successful
+          if (!isUnderLimit(result.file)) {
+            setError(
+              `Unable to compress PDF below 10MB. Original: ${formatFileSize(file.size)}, ` +
+              `After compression: ${formatFileSize(result.compressedSize)}. ` +
+              `Please manually compress using ilovepdf.com or smallpdf.com.`
+            );
+            return;
+          }
+
+          // Compression successful!
+          setSelectedFile(result.file);
+          setWasCompressed(true);
+          console.log(`✅ PDF compressed successfully: ${formatFileSize(file.size)} → ${formatFileSize(result.compressedSize)}`);
+          
+        } catch (compressError: any) {
+          setIsCompressing(false);
+          setCompressionProgress('');
+          setError(compressError.message || 'Failed to compress PDF. Please try compressing manually.');
+          return;
+        }
+      } else {
+        // File is already under 10MB, use as-is
+        setSelectedFile(file);
+      }
     }
   };
 
   const removeFile = () => {
     setSelectedFile(null);
     setError('');
+    setWasCompressed(false);
+    setOriginalFileSize(null);
+    setCompressionProgress('');
   };
 
   const generateAIDescription = async () => {
@@ -360,7 +413,18 @@ export default function UploadPage() {
                 PDF File *
               </label>
               
-              {!selectedFile ? (
+              {/* Compression Progress */}
+              {isCompressing && (
+                <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                  <div>
+                    <h3 className="font-semibold text-blue-900">Compressing PDF...</h3>
+                    <p className="text-blue-700 text-sm">{compressionProgress || 'Please wait...'}</p>
+                  </div>
+                </div>
+              )}
+              
+              {!selectedFile && !isCompressing ? (
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
@@ -378,30 +442,45 @@ export default function UploadPage() {
                       Click to upload PDF
                     </span>
                     <span className="text-gray-500 text-sm">
-                      Maximum file size: 100MB
+                      Up to 50MB (auto-compressed if over 10MB)
                     </span>
                   </label>
                 </div>
-              ) : (
-                <div className="border border-gray-300 rounded-lg p-4 flex items-center justify-between bg-gray-50">
-                  <div className="flex items-center gap-3">
-                    <FileText className="w-8 h-8 text-blue-600" />
-                    <div>
-                      <p className="font-medium text-gray-900">{selectedFile.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
-                      </p>
+              ) : selectedFile ? (
+                <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <FileText className="w-8 h-8 text-blue-600" />
+                      <div>
+                        <p className="font-medium text-gray-900">{selectedFile.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {formatFileSize(selectedFile.size)}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={removeFile}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={removeFile}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+                  
+                  {/* Compression Success Badge */}
+                  {wasCompressed && originalFileSize && (
+                    <div className="mt-3 flex items-center gap-2 text-sm bg-green-100 text-green-800 px-3 py-2 rounded-lg">
+                      <Minimize2 className="w-4 h-4" />
+                      <span>
+                        <strong>Compressed!</strong> {formatFileSize(originalFileSize)} → {formatFileSize(selectedFile.size)} 
+                        <span className="text-green-600 ml-1">
+                          (saved {formatFileSize(originalFileSize - selectedFile.size)})
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
-              )}
+              ) : null}
             </div>
 
             {/* Title */}
