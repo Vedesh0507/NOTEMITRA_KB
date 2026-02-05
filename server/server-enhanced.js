@@ -342,10 +342,10 @@ async function connectMongoDB() {
       createdAt: { type: Date, default: Date.now }
     });
 
-    User = mongoose.model('User', userSchema);
-    Note = mongoose.model('Note', noteSchema);
-    SavedNote = mongoose.model('SavedNote', savedNoteSchema);
-    Comment = mongoose.model('Comment', commentSchema);
+    User = mongoose.models.User || mongoose.model('User', userSchema);
+    Note = mongoose.models.Note || mongoose.model('Note', noteSchema);
+    SavedNote = mongoose.models.SavedNote || mongoose.model('SavedNote', savedNoteSchema);
+    Comment = mongoose.models.Comment || mongoose.model('Comment', commentSchema);
 
     return true;
   } catch (error) {
@@ -2564,7 +2564,7 @@ app.get('/api/notes/:id/comments', async (req, res) => {
   try {
     const noteId = req.params.id;
 
-    if (!useMongoDB) {
+    if (!useMongoDB || !Comment) {
       return res.json({ comments: [] });
     }
 
@@ -2607,6 +2607,10 @@ app.post('/api/notes/:id/comments', async (req, res) => {
       return res.status(503).json({ message: 'Database not available' });
     }
 
+    if (!Comment) {
+      return res.status(503).json({ message: 'Comment service not initialized' });
+    }
+
     if (!mongoose.Types.ObjectId.isValid(noteId) || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
@@ -2640,7 +2644,7 @@ app.post('/api/notes/:id/comments', async (req, res) => {
     });
   } catch (error) {
     console.error('Add comment error:', error);
-    res.status(500).json({ message: 'Failed to add comment' });
+    res.status(500).json({ message: 'Failed to add comment', error: error.message });
   }
 });
 
