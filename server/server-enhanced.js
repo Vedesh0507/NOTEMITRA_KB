@@ -785,19 +785,14 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         
         console.log('📧 Password reset requested for:', normalizedEmail);
         
-        // Try to send email
-        const emailSent = await sendResetEmail(normalizedEmail, resetUrl);
+        // Try to send email (may only work for verified emails on free tier)
+        await sendResetEmail(normalizedEmail, resetUrl);
         
-        if (emailSent) {
-          return res.json({ message: 'Password reset link sent to your email' });
-        } else {
-          // Fallback: return URL directly if email fails
-          console.log('🔗 Reset URL (email not configured):', resetUrl);
-          return res.json({ 
-            message: 'Password reset link generated',
-            _dev_resetUrl: resetUrl 
-          });
-        }
+        // Always return reset URL since email delivery is limited on free tier
+        return res.json({ 
+          message: 'Password reset link generated',
+          _dev_resetUrl: resetUrl 
+        });
       }
     } else {
       // In-memory mode
@@ -811,17 +806,13 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         
         console.log('📧 Password reset requested for:', normalizedEmail);
         
-        const emailSent = await sendResetEmail(normalizedEmail, resetUrl);
+        await sendResetEmail(normalizedEmail, resetUrl);
         
-        if (emailSent) {
-          return res.json({ message: 'Password reset link sent to your email' });
-        } else {
-          console.log('🔗 Reset URL (email not configured):', resetUrl);
-          return res.json({ 
-            message: 'Password reset link generated',
-            _dev_resetUrl: resetUrl 
-          });
-        }
+        // Always return reset URL since email delivery is limited on free tier
+        return res.json({ 
+          message: 'Password reset link generated',
+          _dev_resetUrl: resetUrl 
+        });
       }
     }
 

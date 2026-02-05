@@ -88,36 +88,36 @@ export default function ForgotPasswordPage() {
             we've sent a password reset link. The link will expire in 15 minutes.
           </p>
 
-          {/* Development mode: Show reset URL when email not configured */}
+          {/* Show reset URL directly */}
           {devResetUrl && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
-              <p className="text-sm text-yellow-800 font-medium mb-2">
-                ⚠️ Development Mode (Email not configured)
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+              <p className="text-sm text-blue-800 font-medium mb-2">
+                🔗 Your Password Reset Link
               </p>
-              <p className="text-xs text-yellow-700 mb-2">
-                Use this link to reset your password:
+              <p className="text-xs text-blue-700 mb-3">
+                Click the button below to reset your password:
               </p>
-              <div className="flex items-center gap-2">
+              <Link 
+                href={devResetUrl} 
+                className="inline-block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
+              >
+                Reset Password →
+              </Link>
+              <div className="flex items-center gap-2 mt-3">
                 <input 
                   type="text" 
                   value={devResetUrl} 
                   readOnly 
-                  className="flex-1 text-xs p-2 bg-white border border-yellow-300 rounded truncate"
+                  className="flex-1 text-xs p-2 bg-white border border-blue-300 rounded truncate"
                 />
                 <button
                   onClick={copyToClipboard}
-                  className="p-2 bg-yellow-100 hover:bg-yellow-200 rounded transition-colors"
+                  className="p-2 bg-blue-100 hover:bg-blue-200 rounded transition-colors"
                   title="Copy to clipboard"
                 >
-                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-yellow-700" />}
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4 text-blue-700" />}
                 </button>
               </div>
-              <Link 
-                href={devResetUrl} 
-                className="inline-block mt-2 text-sm text-blue-600 hover:text-blue-700 underline"
-              >
-                Click here to reset password →
-              </Link>
             </div>
           )}
 
