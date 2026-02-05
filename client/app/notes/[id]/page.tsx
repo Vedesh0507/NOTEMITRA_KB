@@ -212,18 +212,8 @@ export default function NoteDetailPage() {
       
       console.log('✅ Using note ID:', noteIdString);
       
-      // Track download (don't let tracking failure stop download)
-      try {
-        await notesAPI.trackDownload(noteIdString);
-        // Increment download count locally for immediate feedback
-        setNote({ ...note, downloads: note.downloads + 1 });
-      } catch (trackError) {
-        console.warn('⚠️  Failed to track download:', trackError);
-        // Continue with download anyway
-      }
-      
-      // STRATEGY 1: Use note ID endpoint (preferred - more robust)
       // Use API base URL which already includes /api
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
       const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
       const downloadUrl = `${apiBase}/notes/${noteIdString}/download`;
       
@@ -283,6 +273,8 @@ export default function NoteDetailPage() {
           // Open signed URL in new tab
           window.open(data.downloadUrl, '_blank');
           console.log('✅ Opened download URL in new tab');
+          // Update local download count
+          setNote({ ...note, downloads: note.downloads + 1 });
         } else {
           throw new Error('Server returned JSON but no download URL found');
         }
@@ -335,6 +327,8 @@ export default function NoteDetailPage() {
         }, 100);
         
         console.log('✅ Download initiated successfully');
+        // Update local download count
+        setNote({ ...note, downloads: note.downloads + 1 });
       }
       
     } catch (error) {
@@ -397,37 +391,27 @@ export default function NoteDetailPage() {
 
     if (!note) return;
 
-    // Toggle vote
-    if (userVote === voteType) {
-      // Remove vote
-      setUserVote(null);
-      if (voteType === 'up') {
-        setNote({ ...note, upvotes: note.upvotes - 1 });
-      } else {
-        setNote({ ...note, downvotes: note.downvotes - 1 });
-      }
-    } else {
-      // Add or change vote
-      const prevVote = userVote;
-      setUserVote(voteType);
-      
-      if (voteType === 'up') {
-        setNote({
-          ...note,
-          upvotes: note.upvotes + 1,
-          downvotes: prevVote === 'down' ? note.downvotes - 1 : note.downvotes
-        });
-      } else {
-        setNote({
-          ...note,
-          downvotes: note.downvotes + 1,
-          upvotes: prevVote === 'up' ? note.upvotes - 1 : note.upvotes
-        });
-      }
-    }
+    const apiVoteType = voteType === 'up' ? 'upvote' : 'downvote';
 
-    // Call API (will implement)
-    // await notesAPI.voteNote(note.id, voteType);
+    try {
+      // Call the backend API to record the vote
+      const response = await notesAPI.voteNote(noteId, apiVoteType);
+      
+      // Update local state with the note returned from server
+      if (response.data.note) {
+        setNote({
+          ...note,
+          upvotes: response.data.note.upvotes,
+          downvotes: response.data.note.downvotes
+        });
+      }
+      
+      // Track user's vote locally for UI feedback
+      setUserVote(voteType);
+    } catch (error) {
+      console.error('Failed to vote:', error);
+      alert('Failed to record vote. Please try again.');
+    }
   };
 
   const handleSubmitComment = async (e: React.FormEvent) => {
