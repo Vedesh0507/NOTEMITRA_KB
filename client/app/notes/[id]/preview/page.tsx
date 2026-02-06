@@ -52,13 +52,19 @@ export default function PDFPreviewPage() {
   const router = useRouter();
   const noteId = params?.id as string;
   
+  // Detect mobile immediately (client-side only)
+  const [isMobile] = useState(() => 
+    typeof window !== 'undefined' 
+      ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      : false
+  );
+  
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const [viewerType, setViewerType] = useState<'native' | 'google' | 'pdfjs'>('native');
   
   // AI Chat state
@@ -73,11 +79,9 @@ export default function PDFPreviewPage() {
 
   useEffect(() => {
     if (noteId) {
+      // Start fetching immediately
       fetchNoteDetails();
     }
-    
-    // Detect mobile
-    setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
     
     // Cleanup timeout on unmount
     return () => {
@@ -135,7 +139,7 @@ export default function PDFPreviewPage() {
 
   const fetchNoteDetails = async () => {
     try {
-      setLoading(true);
+      // Don't block - show UI immediately
       const response = await notesAPI.getNoteById(noteId);
       const fetchedNote = response.data.note;
       
@@ -143,9 +147,8 @@ export default function PDFPreviewPage() {
         if (fetchedNote._id && !fetchedNote.id) {
           fetchedNote.id = fetchedNote._id;
         }
-        setNote(fetchedNote);
         
-        // Set PDF URL - use Google Docs Viewer for all to prevent auto-download
+        // Set PDF URL immediately for fastest loading
         let rawPdfUrl = '';
         
         if (fetchedNote.cloudinaryUrl) {
@@ -157,30 +160,29 @@ export default function PDFPreviewPage() {
           rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
         }
         
+        // Batch state updates for better performance
         if (rawPdfUrl) {
           // Store original URL for downloads
           setOriginalPdfUrl(rawPdfUrl);
           
-          // Detect if mobile
-          const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          setIsMobile(mobile);
-          
-          // Start with native viewer for Cloudinary URLs (most reliable)
-          if (fetchedNote.cloudinaryUrl) {
+          // Start with native viewer for Cloudinary URLs (fastest)
+          // Use native for all initially - most browsers support it now
+          if (fetchedNote.cloudinaryUrl || !isMobile) {
             setViewerType('native');
             setPdfUrl(rawPdfUrl);
           } else {
-            // For other URLs, use Google Docs Viewer
+            // Mobile without Cloudinary - use Google Docs
             setViewerType('google');
             setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
           }
-          
-          setPdfLoading(true);
-          setPdfError(false);
         }
+        
+        // Set note after URL to avoid extra re-renders
+        setNote(fetchedNote);
       }
     } catch (error) {
       console.error('Failed to fetch note:', error);
+      setPdfError(true);
     } finally {
       setLoading(false);
     }
@@ -335,21 +337,12 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
     }
   };
 
-  if (loading) {
+  // Show error state only when loading is complete but no PDF available
+  if (!loading && (!note || !pdfUrl)) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-400">Loading PDF...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!note || !pdfUrl) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
+          <FileText className="w-12 h-12 text-gray-500 mx-auto mb-4" />
           <p className="text-gray-400 mb-4">PDF not available</p>
           <button
             onClick={() => router.push(`/notes/${noteId}`)}
@@ -376,8 +369,17 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
             <span className="hidden sm:inline">Back</span>
           </button>
           <div className="hidden sm:block">
-            <h1 className="text-white font-medium truncate max-w-md">{note.title}</h1>
-            <p className="text-gray-400 text-sm">{note.subject} • Sem {note.semester}</p>
+            {note ? (
+              <>
+                <h1 className="text-white font-medium truncate max-w-md">{note.title}</h1>
+                <p className="text-gray-400 text-sm">{note.subject} • Sem {note.semester}</p>
+              </>
+            ) : (
+              <>
+                <div className="w-48 h-5 bg-gray-700 rounded animate-pulse mb-1"></div>
+                <div className="w-32 h-4 bg-gray-700/50 rounded animate-pulse"></div>
+              </>
+            )}
           </div>
         </div>
 
@@ -396,7 +398,8 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           {/* Download Button */}
           <button
             onClick={handleDownload}
-            className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition"
+            disabled={!note}
+            className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
             title="Download PDF"
           >
             <Download className="w-5 h-5" />
@@ -425,20 +428,21 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
             showChat ? 'lg:w-[65%]' : 'w-full'
           }`}
         >
-          {/* Loading/Error State */}
-          {pdfLoading && (
+          {/* Loading State - Show while fetching or while PDF loads */}
+          {(loading || pdfLoading) && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
               <div className="text-center">
-                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-                <p className="text-white text-lg">Loading PDF...</p>
-                <p className="text-gray-400 text-sm mt-2">This may take a few seconds on mobile</p>
-                <button
-                  onClick={handleDownload}
-                  className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2 mx-auto"
-                >
-                  <Download className="w-4 h-4" />
-                  Download Instead
-                </button>
+                <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto mb-3" />
+                <p className="text-white text-base">{loading ? 'Loading...' : 'Rendering PDF...'}</p>
+                {!loading && (
+                  <button
+                    onClick={handleDownload}
+                    className="mt-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition flex items-center gap-2 mx-auto"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Instead
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -485,27 +489,29 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           )}
           
           {/* Native browser PDF viewer (faster) with fallback */}
-          <iframe
-            src={pdfUrl || ''}
-            className="w-full h-full border-0"
-            title={note.title}
-            allow="autoplay"
-            onLoad={() => {
-              // Clear the timeout since PDF loaded
-              if (pdfLoadTimeoutRef.current) {
-                clearTimeout(pdfLoadTimeoutRef.current);
-              }
-              setPdfLoading(false);
-            }}
-            onError={() => {
-              // Clear timeout and show error
-              if (pdfLoadTimeoutRef.current) {
-                clearTimeout(pdfLoadTimeoutRef.current);
-              }
-              setPdfLoading(false);
-              setPdfError(true);
-            }}
-          />
+          {pdfUrl && (
+            <iframe
+              src={pdfUrl}
+              className="w-full h-full border-0"
+              title={note?.title || 'PDF Preview'}
+              allow="autoplay"
+              onLoad={() => {
+                // Clear the timeout since PDF loaded
+                if (pdfLoadTimeoutRef.current) {
+                  clearTimeout(pdfLoadTimeoutRef.current);
+                }
+                setPdfLoading(false);
+              }}
+              onError={() => {
+                // Clear timeout and show error
+                if (pdfLoadTimeoutRef.current) {
+                  clearTimeout(pdfLoadTimeoutRef.current);
+                }
+                setPdfLoading(false);
+                setPdfError(true);
+              }}
+            />
+          )}
         </div>
 
         {/* AI Chat Panel - Bottom sheet on mobile, side panel on desktop */}
