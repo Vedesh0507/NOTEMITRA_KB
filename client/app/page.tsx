@@ -148,12 +148,12 @@ export default function HomePage() {
           </p>
           <div className="flex flex-row gap-3 justify-center items-center">
             <Link href="/auth/signup" className="inline-block">
-              <Button size="default" className="bg-white text-blue-700 hover:bg-gray-100 font-bold px-5 md:px-6 py-2.5 shadow-lg min-w-[140px]">
+              <Button size="default" variant="ghost" className="!bg-white !text-blue-700 hover:!bg-gray-100 font-bold px-5 md:px-6 py-2.5 shadow-lg min-w-[140px]">
                 Create Account
               </Button>
             </Link>
             <Link href="/auth/signin" className="inline-block">
-              <Button size="default" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/20 font-semibold px-5 md:px-6 py-2.5 min-w-[100px]">
+              <Button size="default" variant="ghost" className="!bg-transparent !border-2 !border-white !text-white hover:!bg-white/20 font-semibold px-5 md:px-6 py-2.5 min-w-[100px]">
                 Sign In
               </Button>
             </Link>
