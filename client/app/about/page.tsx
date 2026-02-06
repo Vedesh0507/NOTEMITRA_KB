@@ -210,12 +210,12 @@ export default function AboutPage() {
           </p>
           <div className="flex flex-row gap-3 justify-center">
             <Link href="/auth/signup">
-              <Button size="default" className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-4 sm:px-6 py-2.5 shadow-lg">
+              <Button size="default" className="bg-white text-blue-700 hover:bg-blue-50 font-bold px-4 sm:px-6 py-2.5 shadow-lg border-0">
                 Create Account
               </Button>
             </Link>
             <Link href="/browse">
-              <Button size="default" variant="outline" className="bg-transparent border-2 border-white/80 text-white hover:bg-white/10 font-semibold px-4 sm:px-6 py-2.5">
+              <Button size="default" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/10 font-semibold px-4 sm:px-6 py-2.5">
                 Browse Notes
               </Button>
             </Link>

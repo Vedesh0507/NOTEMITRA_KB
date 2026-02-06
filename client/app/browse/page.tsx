@@ -285,7 +285,7 @@ export default function BrowsePage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
             {filteredNotes.map((note) => {
               const noteId = note.id || note._id;
               if (!noteId) return null;
@@ -293,55 +293,55 @@ export default function BrowsePage() {
               <div
                 key={noteId}
                 onClick={() => handleNoteClick(noteId)}
-                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden border border-gray-200"
+                className="bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden border border-gray-200 flex flex-col"
               >
                 {/* Note Header */}
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-4">
-                  <h3 className="text-lg font-semibold text-white line-clamp-2">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-2 sm:p-3">
+                  <h3 className="text-xs sm:text-sm font-bold text-white line-clamp-1">
                     {note.title}
                   </h3>
-                  <p className="text-blue-100 text-sm mt-1">{note.subject}</p>
+                  <p className="text-blue-100 text-[10px] sm:text-xs mt-0.5 line-clamp-1">{note.subject}</p>
                 </div>
 
                 {/* Note Content */}
-                <div className="p-4">
-                  <p className="text-gray-600 text-sm line-clamp-3 mb-4">
+                <div className="p-2 sm:p-3 flex-1 flex flex-col">
+                  <p className="text-gray-600 text-[10px] sm:text-xs line-clamp-2 mb-2 flex-1">
                     {note.description}
                   </p>
 
                   {/* Metadata */}
-                  <div className="space-y-2 text-sm text-gray-600 mb-4">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>{note.userName}</span>
+                  <div className="space-y-1.5 text-[10px] sm:text-xs text-gray-600 mb-2">
+                    <div className="flex items-center gap-1">
+                      <User className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">{note.userName}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium">
                         Sem {note.semester}
                       </span>
-                      <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium">
+                      <span className="bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium truncate max-w-[80px] sm:max-w-[100px]">
                         {note.branch}
                       </span>
                     </div>
                   </div>
 
                   {/* Stats */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Eye className="w-4 h-4" />
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div className="flex items-center gap-2 sm:gap-3 text-[10px] sm:text-xs text-gray-500">
+                      <div className="flex items-center gap-0.5">
+                        <Eye className="w-3 h-3" />
                         <span>{note.views}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Download className="w-4 h-4" />
+                      <div className="flex items-center gap-0.5">
+                        <Download className="w-3 h-3" />
                         <span>{note.downloads}</span>
                       </div>
-                      <div className="flex items-center gap-1 text-red-500">
-                        <Heart className="w-4 h-4" />
+                      <div className="flex items-center gap-0.5 text-red-400">
+                        <Heart className="w-3 h-3" />
                         <span>{note.upvotes}</span>
                       </div>
                     </div>
-                    <Calendar className="w-4 h-4 text-gray-400" />
+                    <Calendar className="w-3 h-3 text-gray-300" />
                   </div>
                 </div>
               </div>
