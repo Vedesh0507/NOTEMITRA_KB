@@ -9,16 +9,6 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'NoteMitra - Student Notes Sharing Platform',
   description: 'Share and discover academic notes with students and teachers',
-  keywords: 'notes, education, study, college, university, sharing',
-  authors: [{ name: 'NoteMitra Team' }],
-  manifest: '/manifest.json',
-};
-
-export const viewport = {
-  themeColor: '#2563eb',
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -29,18 +19,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#2563eb" />
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <a href="#main-content" className="skip-link">
-          Skip to main content
-        </a>
         <AuthProvider>
           <Navbar />
-          <main id="main-content" role="main">
+          <main>
             {children}
           </main>
         </AuthProvider>
