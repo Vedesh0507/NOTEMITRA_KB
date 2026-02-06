@@ -4011,26 +4011,47 @@ app.delete('/api/comments/:commentId', async (req, res) => {
   }
 });
 
-// Leaderboard endpoint
+// Leaderboard endpoint - calculates stats from actual notes
 app.get('/api/leaderboard', async (req, res) => {
   try {
     if (useMongoDB) {
-      // MongoDB version
-      const leaderboard = await User.find({ 
-        notesUploaded: { $gt: 0 } // Only users who have uploaded notes
-      })
-      .select('name totalDownloads notesUploaded createdAt')
-      .lean();
+      // MongoDB version - aggregate actual data from notes collection
+      const noteStats = await Note.aggregate([
+        {
+          $group: {
+            _id: '$userId',
+            userName: { $first: '$userName' },
+            notesUploaded: { $sum: 1 },
+            totalDownloads: { $sum: { $ifNull: ['$downloads', 0] } }
+          }
+        },
+        {
+          $match: {
+            notesUploaded: { $gt: 0 } // Only users with actual uploads
+          }
+        }
+      ]);
+
+      // Get user details for join dates
+      const userIds = noteStats.map(stat => stat._id).filter(id => id);
+      const users = await User.find({ _id: { $in: userIds } }).select('name createdAt').lean();
+      const userMap = {};
+      users.forEach(user => {
+        userMap[user._id.toString()] = user;
+      });
 
       // Calculate average and sort
-      const rankedUsers = leaderboard
-        .map(user => ({
-          name: user.name,
-          totalDownloads: user.totalDownloads || 0,
-          notesUploaded: user.notesUploaded || 0,
-          avgDownloads: user.notesUploaded > 0 ? (user.totalDownloads || 0) / user.notesUploaded : 0,
-          joinDate: user.createdAt
-        }))
+      const rankedUsers = noteStats
+        .map(stat => {
+          const user = userMap[stat._id?.toString()] || {};
+          return {
+            name: user.name || stat.userName || 'Unknown User',
+            totalDownloads: stat.totalDownloads || 0,
+            notesUploaded: stat.notesUploaded || 0,
+            avgDownloads: stat.notesUploaded > 0 ? stat.totalDownloads / stat.notesUploaded : 0,
+            joinDate: user.createdAt
+          };
+        })
         .sort((a, b) => {
           // Sort by total downloads (descending)
           if (b.totalDownloads !== a.totalDownloads) {
