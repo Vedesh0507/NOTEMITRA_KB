@@ -109,8 +109,9 @@ let notes = [];
 let useMongoDB = false;
 let googleAuthEnabled = false;
 
-// Add test user for automated testing (when in test mode or in-memory mode)
+// Add test users for automated testing (when in test mode or in-memory mode)
 if (process.env.NODE_ENV === 'test') {
+  // Test user without uploads (won't appear in leaderboard)
   users.push({
     id: 'testuser123',
     _id: 'testuser123',
@@ -121,9 +122,59 @@ if (process.env.NODE_ENV === 'test') {
     branch: 'Computer Science',
     section: 'A',
     notesUploaded: 0,
+    totalDownloads: 0,
     totalViews: 0,
     profilePic: '',
     createdAt: new Date()
+  });
+  
+  // Test users with uploads (will appear in leaderboard)
+  users.push({
+    id: 'leaderuser1',
+    _id: 'leaderuser1',
+    name: 'Top Contributor',
+    email: 'top@example.com',
+    password: 'hashedpassword',
+    role: 'student',
+    branch: 'Computer Science',
+    section: 'A',
+    notesUploaded: 10,
+    totalDownloads: 500,
+    totalViews: 1000,
+    profilePic: '',
+    createdAt: new Date('2025-01-01')
+  });
+  
+  users.push({
+    id: 'leaderuser2',
+    _id: 'leaderuser2',
+    name: 'Active Uploader',
+    email: 'active@example.com',
+    password: 'hashedpassword',
+    role: 'student',
+    branch: 'Electronics',
+    section: 'B',
+    notesUploaded: 5,
+    totalDownloads: 200,
+    totalViews: 400,
+    profilePic: '',
+    createdAt: new Date('2025-02-01')
+  });
+  
+  users.push({
+    id: 'leaderuser3',
+    _id: 'leaderuser3',
+    name: 'New Contributor 🎉',  // With emoji for special character test
+    email: 'new@example.com',
+    password: 'hashedpassword',
+    role: 'student',
+    branch: 'Mechanical',
+    section: 'C',
+    notesUploaded: 2,
+    totalDownloads: 50,
+    totalViews: 100,
+    profilePic: '',
+    createdAt: new Date('2025-03-01')
   });
 }
 
