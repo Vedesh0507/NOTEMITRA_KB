@@ -269,18 +269,55 @@ export default function NoteDetailPage() {
         console.log('📄 Received JSON response with download URL:', data);
         
         if (data.downloadUrl) {
-          // Detect if user is on mobile
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          // Determine proper filename with .pdf extension
+          let filename = note.fileName || `${note.title}.pdf` || 'download.pdf';
+          // Ensure filename has .pdf extension
+          if (!filename.toLowerCase().endsWith('.pdf')) {
+            filename = filename + '.pdf';
+          }
+          // Sanitize filename - remove invalid characters
+          filename = filename.replace(/[<>:"/\\|?*]/g, '_');
           
-          if (isMobile) {
-            // Mobile: Direct navigation to URL for better PDF handling
-            window.location.href = data.downloadUrl;
-          } else {
-            // Desktop: Open in new tab
-            window.open(data.downloadUrl, '_blank');
+          console.log('📁 Using filename:', filename);
+          
+          // Fetch the actual PDF file from Cloudinary URL
+          console.log('📡 Fetching PDF from Cloudinary URL...');
+          const pdfResponse = await fetch(data.downloadUrl);
+          
+          if (!pdfResponse.ok) {
+            throw new Error(`Failed to fetch PDF from Cloudinary: ${pdfResponse.status}`);
           }
           
-          console.log('✅ Opened download URL');
+          const blob = await pdfResponse.blob();
+          console.log('✅ Fetched PDF blob:', {
+            size: blob.size,
+            type: blob.type,
+            sizeInMB: (blob.size / 1024 / 1024).toFixed(2) + ' MB'
+          });
+          
+          // Create a proper PDF blob with explicit MIME type
+          const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+          const blobUrl = window.URL.createObjectURL(pdfBlob);
+          
+          // Create download link with proper filename
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename;
+          link.style.display = 'none';
+          
+          // For mobile, we need to append and click
+          document.body.appendChild(link);
+          console.log('🖱️  Triggering download with filename:', filename);
+          link.click();
+          
+          // Cleanup
+          setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+            console.log('🧹 Cleaned up download resources');
+          }, 5000);
+          
+          console.log('✅ Download initiated with proper filename');
           // Update local download count
           setNote({ ...note, downloads: note.downloads + 1 });
         } else {

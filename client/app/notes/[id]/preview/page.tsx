@@ -34,6 +34,7 @@ interface Note {
   cloudinaryUrl?: string;
   fileUrl?: string;
   fileId?: string;
+  fileName?: string;
 }
 
 interface ChatMessage {
@@ -259,8 +260,47 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
     }
   };
 
-  const handleDownload = () => {
-    if (originalPdfUrl) {
+  const handleDownload = async () => {
+    if (!originalPdfUrl || !note) return;
+    
+    try {
+      // Determine proper filename with .pdf extension
+      let filename = note.fileName || `${note.title}.pdf` || 'download.pdf';
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename = filename + '.pdf';
+      }
+      // Sanitize filename - remove invalid characters
+      filename = filename.replace(/[<>:"/\\|?*]/g, '_');
+      
+      console.log('📥 Downloading PDF with filename:', filename);
+      
+      // Fetch the PDF as blob
+      const response = await fetch(originalPdfUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+      const blobUrl = window.URL.createObjectURL(pdfBlob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+      }, 5000);
+      
+      console.log('✅ Download initiated');
+    } catch (error) {
+      console.error('Download error:', error);
+      // Fallback: open in new tab
       window.open(originalPdfUrl, '_blank');
     }
   };
