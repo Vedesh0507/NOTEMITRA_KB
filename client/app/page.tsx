@@ -129,58 +129,42 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Contact Us / Founders Section */}
+      {/* Contact Us Section */}
       <section className="py-16 md:py-24 px-4 bg-gradient-to-b from-gray-50 to-white">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-10 md:mb-16">
-            <span className="inline-block px-4 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-sm font-semibold rounded-full mb-4">
-              Meet the Team
-            </span>
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8 md:mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-              Our Founders
+              Contact Us
             </h2>
             <p className="text-lg md:text-xl text-gray-600">
               Have questions? We're here to help!
             </p>
           </div>
           
-          {/* Founder Cards Container */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 md:gap-8">
-            {/* Founder 1 */}
-            <div className="group relative w-full max-w-[340px] sm:max-w-none sm:w-1/2">
+          {/* Contact Cards Container - Always side by side */}
+          <div className="grid grid-cols-2 gap-3 md:gap-6">
+            {/* Contact 1 */}
+            <div className="group relative">
               {/* Gradient glow effect */}
               <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 rounded-2xl opacity-75 group-hover:opacity-100 blur-sm transition duration-300"></div>
-              <div className="relative bg-white p-5 md:p-6 rounded-2xl shadow-xl transform transition-all duration-300 md:hover:-translate-y-1 md:hover:shadow-2xl">
-                {/* Founder Badge */}
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold rounded-full shadow-lg">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                    </svg>
-                    Founder
-                  </span>
+              <div className="relative bg-white p-3 md:p-5 rounded-2xl shadow-xl transform transition-all duration-300 md:hover:-translate-y-1 md:hover:shadow-2xl">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg mb-2 md:mb-3">
+                    <User className="h-6 w-6 md:h-7 md:w-7 text-white" />
+                  </div>
+                  <h3 className="text-sm md:text-lg font-bold text-gray-900 truncate w-full">M. Pavan Vedesh</h3>
                 </div>
                 
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
-                    <User className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-gray-900 truncate">M. Pavan Vedesh</h3>
-                    <p className="text-sm text-gray-500">Co-Founder</p>
-                  </div>
-                </div>
-                
-                <div className="mt-4 space-y-2.5">
-                  <a href="mailto:pavanmanepalli521@gmail.com" className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-blue-600 transition-colors group/link">
-                    <div className="p-1.5 bg-blue-50 rounded-lg group-hover/link:bg-blue-100 transition-colors">
-                      <Mail className="h-4 w-4 text-blue-600" />
+                <div className="mt-3 space-y-2">
+                  <a href="mailto:pavanmanepalli521@gmail.com" className="flex items-center gap-2 text-xs md:text-sm text-gray-600 hover:text-blue-600 transition-colors group/link">
+                    <div className="p-1 md:p-1.5 bg-blue-50 rounded-lg group-hover/link:bg-blue-100 transition-colors flex-shrink-0">
+                      <Mail className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
                     </div>
                     <span className="truncate">pavanmanepalli521@gmail.com</span>
                   </a>
-                  <a href="tel:+919391781748" className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-blue-600 transition-colors group/link">
-                    <div className="p-1.5 bg-blue-50 rounded-lg group-hover/link:bg-blue-100 transition-colors">
-                      <Phone className="h-4 w-4 text-blue-600" />
+                  <a href="tel:+919391781748" className="flex items-center gap-2 text-xs md:text-sm text-gray-600 hover:text-blue-600 transition-colors group/link">
+                    <div className="p-1 md:p-1.5 bg-blue-50 rounded-lg group-hover/link:bg-blue-100 transition-colors flex-shrink-0">
+                      <Phone className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
                     </div>
                     <span>+91 93917 81748</span>
                   </a>
@@ -188,41 +172,28 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Founder 2 */}
-            <div className="group relative w-full max-w-[340px] sm:max-w-none sm:w-1/2">
+            {/* Contact 2 */}
+            <div className="group relative">
               {/* Gradient glow effect */}
               <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 rounded-2xl opacity-75 group-hover:opacity-100 blur-sm transition duration-300"></div>
-              <div className="relative bg-white p-5 md:p-6 rounded-2xl shadow-xl transform transition-all duration-300 md:hover:-translate-y-1 md:hover:shadow-2xl">
-                {/* Founder Badge */}
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold rounded-full shadow-lg">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                    </svg>
-                    Founder
-                  </span>
+              <div className="relative bg-white p-3 md:p-5 rounded-2xl shadow-xl transform transition-all duration-300 md:hover:-translate-y-1 md:hover:shadow-2xl">
+                <div className="flex flex-col items-center text-center">
+                  <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg mb-2 md:mb-3">
+                    <User className="h-6 w-6 md:h-7 md:w-7 text-white" />
+                  </div>
+                  <h3 className="text-sm md:text-lg font-bold text-gray-900 truncate w-full">D. Mohan Gupta</h3>
                 </div>
                 
-                <div className="flex items-center gap-4 mt-3">
-                  <div className="flex-shrink-0 w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center shadow-lg">
-                    <User className="h-7 w-7 md:h-8 md:w-8 text-white" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg md:text-xl font-bold text-gray-900 truncate">D. Mohan Gupta</h3>
-                    <p className="text-sm text-gray-500">Co-Founder</p>
-                  </div>
-                </div>
-                
-                <div className="mt-4 space-y-2.5">
-                  <a href="mailto:mohangupta16@gmail.com" className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-purple-600 transition-colors group/link">
-                    <div className="p-1.5 bg-purple-50 rounded-lg group-hover/link:bg-purple-100 transition-colors">
-                      <Mail className="h-4 w-4 text-purple-600" />
+                <div className="mt-3 space-y-2">
+                  <a href="mailto:mohangupta16@gmail.com" className="flex items-center gap-2 text-xs md:text-sm text-gray-600 hover:text-purple-600 transition-colors group/link">
+                    <div className="p-1 md:p-1.5 bg-purple-50 rounded-lg group-hover/link:bg-purple-100 transition-colors flex-shrink-0">
+                      <Mail className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
                     </div>
                     <span className="truncate">mohangupta16@gmail.com</span>
                   </a>
-                  <a href="tel:+918790965198" className="flex items-center gap-2.5 text-sm text-gray-600 hover:text-purple-600 transition-colors group/link">
-                    <div className="p-1.5 bg-purple-50 rounded-lg group-hover/link:bg-purple-100 transition-colors">
-                      <Phone className="h-4 w-4 text-purple-600" />
+                  <a href="tel:+918790965198" className="flex items-center gap-2 text-xs md:text-sm text-gray-600 hover:text-purple-600 transition-colors group/link">
+                    <div className="p-1 md:p-1.5 bg-purple-50 rounded-lg group-hover/link:bg-purple-100 transition-colors flex-shrink-0">
+                      <Phone className="h-3 w-3 md:h-4 md:w-4 text-purple-600" />
                     </div>
                     <span>+91 87909 65198</span>
                   </a>
