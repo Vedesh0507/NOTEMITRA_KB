@@ -59,6 +59,7 @@ export default function PDFPreviewPage() {
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [viewerType, setViewerType] = useState<'native' | 'google' | 'pdfjs'>('native');
   
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -86,14 +87,23 @@ export default function PDFPreviewPage() {
     };
   }, [noteId]);
 
-  // Show error if Google Docs Viewer takes too long to load
+  // Show error if PDF takes too long to load
   useEffect(() => {
     if (pdfLoading && pdfUrl) {
       pdfLoadTimeoutRef.current = setTimeout(() => {
-        console.log('PDF preview timeout - showing error options');
-        setPdfLoading(false);
-        setPdfError(true);
-      }, 25000); // 25 second timeout for slow mobile connections
+        console.log('PDF preview timeout - trying next viewer');
+        // Auto-try next viewer type
+        if (viewerType === 'native' && originalPdfUrl) {
+          setViewerType('google');
+          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
+        } else if (viewerType === 'google' && originalPdfUrl) {
+          setViewerType('pdfjs');
+          setPdfUrl(`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(originalPdfUrl)}`);
+        } else {
+          setPdfLoading(false);
+          setPdfError(true);
+        }
+      }, 15000); // 15 second timeout, then try next viewer
     }
     
     return () => {
@@ -101,7 +111,7 @@ export default function PDFPreviewPage() {
         clearTimeout(pdfLoadTimeoutRef.current);
       }
     };
-  }, [pdfLoading, pdfUrl]);
+  }, [pdfLoading, pdfUrl, viewerType, originalPdfUrl]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -153,15 +163,15 @@ export default function PDFPreviewPage() {
           
           // Detect if mobile
           const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          setIsMobile(mobile);
           
-          if (mobile) {
-            // Mobile: Use Google Docs Viewer (most reliable for mobile browsers)
-            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
-          } else if (fetchedNote.cloudinaryUrl) {
-            // Desktop + Cloudinary: Use direct URL (fast, native browser PDF viewer)
+          // Start with native viewer for Cloudinary URLs (most reliable)
+          if (fetchedNote.cloudinaryUrl) {
+            setViewerType('native');
             setPdfUrl(rawPdfUrl);
           } else {
-            // Desktop + GridFS/external: Use Google Docs Viewer
+            // For other URLs, use Google Docs Viewer
+            setViewerType('google');
             setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
           }
           
@@ -442,9 +452,15 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button
                     onClick={() => {
-                      // Try Google Docs Viewer as fallback
+                      // Try different viewer
                       if (originalPdfUrl) {
-                        setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
+                        if (viewerType !== 'google') {
+                          setViewerType('google');
+                          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
+                        } else {
+                          setViewerType('pdfjs');
+                          setPdfUrl(`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(originalPdfUrl)}`);
+                        }
                         setPdfError(false);
                         setPdfLoading(true);
                       }

@@ -139,27 +139,27 @@ export default function HomePage() {
 
       {/* CTA Section - Compact & Clean */}
       <section className="py-10 md:py-14 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white relative overflow-hidden">
-        {/* Subtle background pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
-          <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+        {/* Subtle background pattern - moved to edges */}
+        <div className="absolute inset-0 opacity-10 pointer-events-none">
+          <div className="absolute -top-20 -left-20 w-40 h-40 bg-white rounded-full blur-3xl"></div>
+          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-white rounded-full blur-3xl"></div>
         </div>
         
-        <div className="max-w-2xl mx-auto text-center relative z-10">
+        <div className="max-w-2xl mx-auto text-center relative z-20">
           <h2 className="text-2xl md:text-3xl font-bold mb-2">
             Join NoteMitra Today
           </h2>
           <p className="text-sm md:text-base mb-5 opacity-90">
             Start sharing and discovering quality academic notes
           </p>
-          <div className="flex flex-row gap-3 justify-center">
-            <Link href="/auth/signup">
-              <Button size="default" className="bg-white text-blue-700 hover:bg-blue-50 font-bold px-5 md:px-6 py-2.5 shadow-lg border-0">
+          <div className="flex flex-row gap-3 justify-center items-center">
+            <Link href="/auth/signup" className="inline-block">
+              <Button size="default" className="bg-white text-blue-700 hover:bg-blue-50 font-bold px-5 md:px-6 py-2.5 shadow-lg border-2 border-white min-w-[140px]">
                 Create Account
               </Button>
             </Link>
-            <Link href="/auth/signin">
-              <Button size="default" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/10 font-semibold px-5 md:px-6 py-2.5">
+            <Link href="/auth/signin" className="inline-block">
+              <Button size="default" variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/20 font-semibold px-5 md:px-6 py-2.5 min-w-[100px]">
                 Sign In
               </Button>
             </Link>
