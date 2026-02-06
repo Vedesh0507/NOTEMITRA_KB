@@ -20,6 +20,10 @@ const nextConfig = {
   generateEtags: true,
   // Optimize page loading
   poweredByHeader: false,
+  // Exclude scripts from build tracing to fix stack overflow
+  outputFileTracingExcludes: {
+    '*': ['./scripts/**', './scripts/generate-icons.js'],
+  },
 }
 
 module.exports = nextConfig

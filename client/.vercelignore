@@ -1,0 +1,12 @@
+# Ignore local development scripts
+scripts/
+
+# Ignore test files
+**/*.test.js
+**/*.test.ts
+__tests__/
+
+# Ignore unnecessary files
+*.md
+.env.local
+.env.development
