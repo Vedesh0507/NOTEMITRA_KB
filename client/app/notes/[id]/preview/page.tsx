@@ -58,6 +58,7 @@ export default function PDFPreviewPage() {
   const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -74,6 +75,9 @@ export default function PDFPreviewPage() {
       fetchNoteDetails();
     }
     
+    // Detect mobile
+    setIsMobile(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    
     // Cleanup timeout on unmount
     return () => {
       if (pdfLoadTimeoutRef.current) {
@@ -89,7 +93,7 @@ export default function PDFPreviewPage() {
         console.log('PDF preview timeout - showing error options');
         setPdfLoading(false);
         setPdfError(true);
-      }, 15000); // 15 second timeout
+      }, 25000); // 25 second timeout for slow mobile connections
     }
     
     return () => {
@@ -147,8 +151,20 @@ export default function PDFPreviewPage() {
           // Store original URL for downloads
           setOriginalPdfUrl(rawPdfUrl);
           
-          // Always use Google Docs Viewer for preview to prevent auto-download
-          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
+          // Detect if mobile
+          const mobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          
+          if (mobile) {
+            // Mobile: Use Google Docs Viewer (most reliable for mobile browsers)
+            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
+          } else if (fetchedNote.cloudinaryUrl) {
+            // Desktop + Cloudinary: Use direct URL (fast, native browser PDF viewer)
+            setPdfUrl(rawPdfUrl);
+          } else {
+            // Desktop + GridFS/external: Use Google Docs Viewer
+            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
+          }
+          
           setPdfLoading(true);
           setPdfError(false);
         }
@@ -405,7 +421,14 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
               <div className="text-center">
                 <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
                 <p className="text-white text-lg">Loading PDF...</p>
-                <p className="text-gray-400 text-sm mt-2">This may take a few seconds</p>
+                <p className="text-gray-400 text-sm mt-2">This may take a few seconds on mobile</p>
+                <button
+                  onClick={handleDownload}
+                  className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2 mx-auto"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Instead
+                </button>
               </div>
             </div>
           )}
