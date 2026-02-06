@@ -394,7 +394,11 @@ describe('Notes API', () => {
 
       it('should handle special characters in description', async () => {
         const specialDescription = 'Description with <html> tags & special "characters" $%^&*()';
-        const noteWithSpecialDesc = { ...validNoteData, description: specialDescription };
+        const noteWithSpecialDesc = { 
+          ...validNoteData, 
+          title: `Special Desc Test ${Date.now()}`,
+          description: specialDescription 
+        };
 
         const response = await request(app)
           .post('/api/notes')
@@ -406,10 +410,10 @@ describe('Notes API', () => {
       });
     });
 
-    // Test 3: Create Duplicate Note
+    // Test 3: Create Duplicate Note - Now returns 409 for duplicate title in same subject/semester
     describe('POST /api/notes - Create Duplicate Note', () => {
-      it('should allow creating notes with duplicate titles', async () => {
-        const duplicateTitle = 'Duplicate Note Title';
+      it('should return 409 for duplicate title in same subject and semester', async () => {
+        const duplicateTitle = `Duplicate Test ${Date.now()}`;
         const noteData = { ...validNoteData, title: duplicateTitle };
 
         // Create first note
@@ -421,7 +425,7 @@ describe('Notes API', () => {
         // 401 can happen if user not found in DB
         expect([200, 201, 401]).toContain(firstResponse.status);
 
-        // Create second note with same title (only if first succeeded)
+        // Create second note with same title - should fail with 409
         if (firstResponse.status === 201) {
           const secondResponse = await request(app)
             .post('/api/notes')
