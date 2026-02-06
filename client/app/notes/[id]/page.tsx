@@ -264,14 +264,23 @@ export default function NoteDetailPage() {
       const contentType = response.headers.get('content-type');
       
       if (contentType && contentType.includes('application/json')) {
-        // Response is JSON with downloadUrl (Supabase/signed URL mode)
+        // Response is JSON with downloadUrl (Cloudinary/signed URL mode)
         const data = await response.json();
         console.log('📄 Received JSON response with download URL:', data);
         
         if (data.downloadUrl) {
-          // Open signed URL in new tab
-          window.open(data.downloadUrl, '_blank');
-          console.log('✅ Opened download URL in new tab');
+          // Detect if user is on mobile
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          
+          if (isMobile) {
+            // Mobile: Direct navigation to URL for better PDF handling
+            window.location.href = data.downloadUrl;
+          } else {
+            // Desktop: Open in new tab
+            window.open(data.downloadUrl, '_blank');
+          }
+          
+          console.log('✅ Opened download URL');
           // Update local download count
           setNote({ ...note, downloads: note.downloads + 1 });
         } else {
@@ -306,24 +315,69 @@ export default function NoteDetailPage() {
         
         console.log('📁 Using filename:', filename);
         
-        // Create download link using Blob URL
-        const blobUrl = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename;
-        link.style.display = 'none';
+        // Ensure filename has .pdf extension
+        if (!filename.toLowerCase().endsWith('.pdf')) {
+          filename = filename + '.pdf';
+        }
         
-        // Add to document, click, and cleanup
-        document.body.appendChild(link);
-        console.log('🖱️  Triggering download...');
-        link.click();
+        // Create a proper PDF blob with explicit MIME type
+        const pdfBlob = new Blob([blob], { type: 'application/pdf' });
         
-        // Cleanup after a short delay
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-          console.log('🧹 Cleaned up download resources');
-        }, 100);
+        // Detect if user is on mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        console.log('📱 Device detection:', { isMobile, userAgent: navigator.userAgent });
+        
+        if (isMobile) {
+          // Mobile: Open PDF in new tab/window for native PDF viewer
+          const blobUrl = window.URL.createObjectURL(pdfBlob);
+          
+          // Try to open in new window first
+          const newWindow = window.open(blobUrl, '_blank');
+          
+          if (!newWindow) {
+            // If popup blocked, try direct navigation
+            console.log('📱 Popup blocked, trying direct download...');
+            
+            // Create a download link as fallback
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.download = filename;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            
+            setTimeout(() => {
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(blobUrl);
+            }, 5000);
+          } else {
+            // Cleanup after a delay
+            setTimeout(() => {
+              window.URL.revokeObjectURL(blobUrl);
+            }, 60000); // Keep URL alive for 1 minute for mobile viewers
+          }
+          
+          console.log('✅ PDF opened for mobile viewing');
+        } else {
+          // Desktop: Use standard download approach
+          const blobUrl = window.URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = filename;
+          link.style.display = 'none';
+          
+          document.body.appendChild(link);
+          console.log('🖱️  Triggering download...');
+          link.click();
+          
+          setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(blobUrl);
+            console.log('🧹 Cleaned up download resources');
+          }, 1000);
+        }
         
         console.log('✅ Download initiated successfully');
         // Update local download count

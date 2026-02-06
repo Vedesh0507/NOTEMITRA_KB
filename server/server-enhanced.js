@@ -2347,10 +2347,17 @@ app.get('/api/notes/view-pdf/:fileId', async (req, res) => {
 
     console.log('✅ File found for preview:', files.filename);
 
+    // Sanitize filename and ensure .pdf extension
+    let sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+    if (!sanitizedFilename.toLowerCase().endsWith('.pdf')) {
+      sanitizedFilename += '.pdf';
+    }
+    const encodedFilename = encodeURIComponent(sanitizedFilename).replace(/['()]/g, escape);
+
     // Set proper headers for PDF inline viewing
     res.set({
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="${files.filename}"`,
+      'Content-Disposition': `inline; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`,
       'Content-Length': files.length,
       'Cache-Control': 'public, max-age=31536000',
       'Accept-Ranges': 'bytes'
@@ -2456,13 +2463,19 @@ app.get('/api/notes/download-pdf/:fileId', async (req, res) => {
       contentType: files.contentType
     });
 
-    // Sanitize filename for Content-Disposition header
-    const sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+    // Sanitize filename and ensure .pdf extension
+    let sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+    if (!sanitizedFilename.toLowerCase().endsWith('.pdf')) {
+      sanitizedFilename += '.pdf';
+    }
+    
+    // RFC 5987 compliant filename encoding for better mobile support
+    const encodedFilename = encodeURIComponent(sanitizedFilename).replace(/['()]/g, escape);
 
     // Set proper headers for PDF download (attachment forces download)
     res.set({
-      'Content-Type': files.contentType || 'application/pdf',
-      'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`,
       'Content-Length': files.length,
       'Cache-Control': 'public, max-age=31536000',
       'Accept-Ranges': 'bytes',
@@ -2590,15 +2603,22 @@ app.get('/api/notes/:noteId/download', async (req, res) => {
           size: files.length
         });
 
-        // Sanitize filename
-        const sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+        // Sanitize filename and ensure .pdf extension
+        let sanitizedFilename = files.filename.replace(/[^\w\s.-]/gi, '_');
+        if (!sanitizedFilename.toLowerCase().endsWith('.pdf')) {
+          sanitizedFilename += '.pdf';
+        }
+        
+        // RFC 5987 compliant filename encoding for better mobile support
+        const encodedFilename = encodeURIComponent(sanitizedFilename).replace(/['()]/g, escape);
 
-        // Set download headers
+        // Set download headers with mobile-friendly options
         res.set({
-          'Content-Type': files.contentType || 'application/pdf',
-          'Content-Disposition': `attachment; filename="${sanitizedFilename}"`,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`,
           'Content-Length': files.length,
           'Cache-Control': 'public, max-age=31536000',
+          'Accept-Ranges': 'bytes',
           'X-Note-Id': noteIdParam,
           'X-File-Id': files._id.toString()
         });
