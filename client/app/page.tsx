@@ -138,14 +138,8 @@ export default function HomePage() {
       {/* Stats Section - REMOVED */}
 
       {/* CTA Section - Compact & Clean */}
-      <section className="py-10 md:py-14 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white relative overflow-hidden">
-        {/* Subtle background pattern - moved to edges */}
-        <div className="absolute inset-0 opacity-10 pointer-events-none">
-          <div className="absolute -top-20 -left-20 w-40 h-40 bg-white rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-20 -right-20 w-40 h-40 bg-white rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="max-w-2xl mx-auto text-center relative z-20">
+      <section className="py-10 md:py-14 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white relative">
+        <div className="max-w-2xl mx-auto text-center relative z-10">
           <h2 className="text-2xl md:text-3xl font-bold mb-2">
             Join NoteMitra Today
           </h2>
@@ -154,7 +148,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-row gap-3 justify-center items-center">
             <Link href="/auth/signup" className="inline-block">
-              <Button size="default" className="bg-white text-blue-700 hover:bg-blue-50 font-bold px-5 md:px-6 py-2.5 shadow-lg border-2 border-white min-w-[140px]">
+              <Button size="default" className="bg-white text-blue-700 hover:bg-gray-100 font-bold px-5 md:px-6 py-2.5 shadow-lg min-w-[140px]">
                 Create Account
               </Button>
             </Link>
