@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import {
   Download,
   Eye,
-  ThumbsUp,
-  ThumbsDown,
+  Heart,
   MessageSquare,
   Calendar,
   User,
@@ -65,7 +64,7 @@ export default function NoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [userVote, setUserVote] = useState<'up' | 'down' | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
 
@@ -92,6 +91,7 @@ export default function NoteDetailPage() {
       });
       
       const fetchedNote = noteResponse.data.note;
+      const userLiked = noteResponse.data.userLiked;
       
       // Ensure note has proper ID fields
       if (fetchedNote) {
@@ -106,13 +106,15 @@ export default function NoteDetailPage() {
           hasId: !!fetchedNote.id,
           has_id: !!fetchedNote._id,
           title: fetchedNote.title,
-          fileId: fetchedNote.fileId
+          fileId: fetchedNote.fileId,
+          userLiked
         });
       } else {
         console.error('❌ No note in response');
       }
       
       setNote(fetchedNote);
+      setIsLiked(userLiked || false);
 
       // Fetch real comments from the backend
       try {
@@ -457,7 +459,7 @@ export default function NoteDetailPage() {
     router.push(`/notes/${noteIdToUse}/preview`);
   };
 
-  const handleVote = async (voteType: 'up' | 'down') => {
+  const handleLike = async () => {
     if (!user) {
       router.push('/auth/signin');
       return;
@@ -465,26 +467,35 @@ export default function NoteDetailPage() {
 
     if (!note) return;
 
-    const apiVoteType = voteType === 'up' ? 'upvote' : 'downvote';
+    // Optimistic UI update for instant feedback
+    const wasLiked = isLiked;
+    setIsLiked(!wasLiked);
+    setNote({
+      ...note,
+      upvotes: wasLiked ? note.upvotes - 1 : note.upvotes + 1
+    });
 
     try {
-      // Call the backend API to record the vote
-      const response = await notesAPI.voteNote(noteId, apiVoteType);
+      // Call the backend API - always use 'upvote', backend handles toggle
+      const response = await notesAPI.voteNote(noteId, 'upvote');
       
-      // Update local state with the note returned from server
+      // Update with actual server values
       if (response.data.note) {
-        setNote({
-          ...note,
-          upvotes: response.data.note.upvotes,
-          downvotes: response.data.note.downvotes
-        });
+        setNote(prev => prev ? {
+          ...prev,
+          upvotes: response.data.note.upvotes
+        } : prev);
+        // Check if user has liked based on response
+        setIsLiked(response.data.userLiked ?? !wasLiked);
       }
-      
-      // Track user's vote locally for UI feedback
-      setUserVote(voteType);
     } catch (error) {
-      console.error('Failed to vote:', error);
-      alert('Failed to record vote. Please try again.');
+      console.error('Failed to like:', error);
+      // Revert optimistic update on error
+      setIsLiked(wasLiked);
+      setNote(prev => prev ? {
+        ...prev,
+        upvotes: wasLiked ? prev.upvotes + 1 : prev.upvotes - 1
+      } : prev);
     }
   };
 
@@ -666,32 +677,22 @@ export default function NoteDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-              {/* Voting */}
-              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                <button
-                  onClick={() => handleVote('up')}
-                  className={`p-2 rounded ${
-                    userVote === 'up'
-                      ? 'bg-blue-600 text-white'
-                      : 'hover:bg-gray-200 text-gray-600'
+              {/* Like Button - Instagram style */}
+              <button
+                onClick={handleLike}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all duration-200 active:scale-95"
+              >
+                <Heart
+                  className={`w-5 h-5 transition-all duration-200 ${
+                    isLiked
+                      ? 'fill-red-500 text-red-500 scale-110'
+                      : 'text-gray-600 hover:text-red-400'
                   }`}
-                >
-                  <ThumbsUp className="w-4 h-4" />
-                </button>
-                <span className="px-2 font-medium text-gray-900">
-                  {note.upvotes - note.downvotes}
+                />
+                <span className="font-medium text-gray-900">
+                  {note.upvotes}
                 </span>
-                <button
-                  onClick={() => handleVote('down')}
-                  className={`p-2 rounded ${
-                    userVote === 'down'
-                      ? 'bg-red-600 text-white'
-                      : 'hover:bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  <ThumbsDown className="w-4 h-4" />
-                </button>
-              </div>
+              </button>
 
               {/* Save */}
               <Button variant="outline" size="sm" onClick={handleSaveNote}>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, Filter, SlidersHorizontal, Download, Eye, ThumbsUp, Calendar, User } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, Download, Eye, Heart, Calendar, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { notesAPI } from '@/lib/api';
 import { CURRICULUM, BRANCHES, SEMESTERS } from '@/lib/curriculum';
@@ -100,7 +100,7 @@ export default function BrowsePage() {
         case 'oldest':
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         case 'popular':
-          return (b.upvotes - b.downvotes) - (a.upvotes - a.downvotes);
+          return b.upvotes - a.upvotes; // Sort by likes only
         case 'downloaded':
           return b.downloads - a.downloads;
         default:
@@ -336,8 +336,8 @@ export default function BrowsePage() {
                         <Download className="w-4 h-4" />
                         <span>{note.downloads}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <ThumbsUp className="w-4 h-4" />
+                      <div className="flex items-center gap-1 text-red-500">
+                        <Heart className="w-4 h-4" />
                         <span>{note.upvotes}</span>
                       </div>
                     </div>

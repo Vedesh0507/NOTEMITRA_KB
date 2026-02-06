@@ -449,6 +449,7 @@ async function connectMongoDB() {
       downloads: { type: Number, default: 0 },
       upvotes: { type: Number, default: 0 },
       downvotes: { type: Number, default: 0 },
+      likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track who liked
       isApproved: { type: Boolean, default: true },
       isReported: { type: Boolean, default: false },
       reportReason: String,
@@ -2988,6 +2989,13 @@ app.get('/api/notes/:id', async (req, res) => {
       return res.status(400).json({ message: 'Note ID is required' });
     }
 
+    // Extract user ID from token if present (for checking if user liked)
+    let currentUserId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer dev_token_')) {
+      currentUserId = authHeader.replace('Bearer dev_token_', '');
+    }
+
     if (useMongoDB) {
       // Validate ObjectId format
       if (!mongoose.Types.ObjectId.isValid(noteId)) {
@@ -3008,6 +3016,12 @@ app.get('/api/notes/:id', async (req, res) => {
       // Update user's total views
       if (note.userId) {
         await User.findByIdAndUpdate(note.userId, { $inc: { totalViews: 1 } });
+      }
+
+      // Check if current user has liked this note
+      let userLiked = false;
+      if (currentUserId && mongoose.Types.ObjectId.isValid(currentUserId) && note.likedBy) {
+        userLiked = note.likedBy.some(id => id.toString() === currentUserId);
       }
 
       // CRITICAL: Convert ObjectIds to strings for frontend
@@ -3032,10 +3046,11 @@ app.get('/api/notes/:id', async (req, res) => {
         _id: note._id,
         title: note.title,
         fileId: note.fileId,
-        hasFileId: !!note.fileId
+        hasFileId: !!note.fileId,
+        userLiked
       });
 
-      res.json({ note });
+      res.json({ note, userLiked });
     } else {
       // In-memory version
       const noteIdNum = parseInt(noteId);
@@ -3049,7 +3064,14 @@ app.get('/api/notes/:id', async (req, res) => {
       }
 
       note.views += 1;
-      res.json({ note });
+      
+      // Check if user liked (in-memory)
+      let userLiked = false;
+      if (currentUserId && note.likedBy) {
+        userLiked = note.likedBy.includes(currentUserId);
+      }
+      
+      res.json({ note, userLiked });
     }
   } catch (error) {
     console.error('Get note error:', error);
@@ -3298,7 +3320,7 @@ app.delete('/api/notes/:id', async (req, res) => {
   }
 });
 
-// Vote on a note
+// Vote on a note (Instagram-style like toggle)
 app.post('/api/notes/:id/vote', async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
@@ -3334,30 +3356,17 @@ app.post('/api/notes/:id/vote', async (req, res) => {
         error: 'INVALID_TOKEN'
       });
     }
+    
+    // Extract user ID from token
+    const userId = token.replace('dev_token_', '');
 
     const noteId = req.params.id;
-    const { voteType } = req.body;
     
     // Validate noteId
     if (!noteId || noteId.trim() === '') {
       return res.status(400).json({ 
         message: 'Note ID is required',
         error: 'NOTE_ID_REQUIRED'
-      });
-    }
-    
-    // Validate voteType
-    if (!voteType) {
-      return res.status(400).json({ 
-        message: 'Vote type is required',
-        error: 'VOTE_TYPE_REQUIRED'
-      });
-    }
-    
-    if (!['upvote', 'downvote'].includes(voteType)) {
-      return res.status(400).json({ 
-        message: 'Invalid vote type. Must be "upvote" or "downvote"',
-        error: 'INVALID_VOTE_TYPE'
       });
     }
 
@@ -3379,21 +3388,66 @@ app.post('/api/notes/:id/vote', async (req, res) => {
         });
       }
 
-      // MongoDB version
-      const update = voteType === 'upvote' 
-        ? { $inc: { upvotes: 1 } }
-        : { $inc: { downvotes: 1 } };
-
-      const note = await Note.findByIdAndUpdate(noteId, update, { new: true }).lean();
-
-      // Update uploader's reputation (upvote = +10 points)
-      if (voteType === 'upvote' && note.userId) {
-        await User.findByIdAndUpdate(note.userId, { $inc: { reputation: 10 } });
+      // Initialize likedBy array if it doesn't exist
+      if (!existingNote.likedBy) {
+        existingNote.likedBy = [];
       }
 
-      res.json({ message: `${voteType === 'upvote' ? 'Upvote' : 'Downvote'} recorded successfully`, note });
+      // Check if user already liked this note
+      const userObjectId = mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : null;
+      
+      const hasLiked = userObjectId && existingNote.likedBy.some(
+        id => id.toString() === userObjectId.toString()
+      );
+
+      let note;
+      let userLiked;
+
+      if (hasLiked) {
+        // Unlike: Remove user from likedBy and decrement upvotes
+        note = await Note.findByIdAndUpdate(
+          noteId, 
+          { 
+            $pull: { likedBy: userObjectId },
+            $inc: { upvotes: -1 }
+          }, 
+          { new: true }
+        ).lean();
+        userLiked = false;
+        
+        // Decrease uploader's reputation
+        if (existingNote.userId) {
+          await User.findByIdAndUpdate(existingNote.userId, { $inc: { reputation: -10 } });
+        }
+      } else {
+        // Like: Add user to likedBy and increment upvotes
+        const updateQuery = { $inc: { upvotes: 1 } };
+        if (userObjectId) {
+          updateQuery.$addToSet = { likedBy: userObjectId };
+        }
+        
+        note = await Note.findByIdAndUpdate(
+          noteId, 
+          updateQuery, 
+          { new: true }
+        ).lean();
+        userLiked = true;
+        
+        // Increase uploader's reputation
+        if (existingNote.userId) {
+          await User.findByIdAndUpdate(existingNote.userId, { $inc: { reputation: 10 } });
+        }
+      }
+
+      res.json({ 
+        message: userLiked ? 'Liked!' : 'Unliked!', 
+        note,
+        userLiked
+      });
     } else {
-      // In-memory version
+      // In-memory version (simple toggle)
       const noteIdNum = parseInt(noteId);
       if (isNaN(noteIdNum)) {
         return res.status(400).json({ message: 'Invalid note ID format' });
@@ -3404,13 +3458,25 @@ app.post('/api/notes/:id/vote', async (req, res) => {
         return res.status(404).json({ message: 'Note not found with the provided ID' });
       }
 
-      if (voteType === 'upvote') {
+      // Initialize likedBy if it doesn't exist
+      if (!note.likedBy) note.likedBy = [];
+      
+      const userIndex = note.likedBy.indexOf(userId);
+      let userLiked;
+      
+      if (userIndex > -1) {
+        // Unlike
+        note.likedBy.splice(userIndex, 1);
+        note.upvotes = Math.max(0, note.upvotes - 1);
+        userLiked = false;
+      } else {
+        // Like
+        note.likedBy.push(userId);
         note.upvotes += 1;
-      } else if (voteType === 'downvote') {
-        note.downvotes += 1;
+        userLiked = true;
       }
 
-      res.json({ message: `${voteType === 'upvote' ? 'Upvote' : 'Downvote'} recorded successfully`, note });
+      res.json({ message: userLiked ? 'Liked!' : 'Unliked!', note, userLiked });
     }
   } catch (error) {
     console.error('Vote error:', error);

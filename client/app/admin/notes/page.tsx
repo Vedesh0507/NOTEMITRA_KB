@@ -155,8 +155,7 @@ export default function NotesManagement() {
                           <Download className="w-4 h-4 mr-1" />
                           {note.downloads}
                         </span>
-                        <span>👍 {note.upvotes}</span>
-                        <span>👎 {note.downvotes}</span>
+                        <span>❤️ {note.upvotes}</span>
                       </div>
 
                       <div className="text-xs text-gray-500 mt-2">
