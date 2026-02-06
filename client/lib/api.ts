@@ -16,7 +16,7 @@ const API_URL = getApiUrl();
 // Create axios instance with optimized settings
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 30000, // 30 second timeout
+  timeout: 120000, // 2 minute timeout for uploads
   headers: {
     'Content-Type': 'application/json',
   },
@@ -118,16 +118,25 @@ export const authAPI = {
 
 // Notes API
 export const notesAPI = {
-  uploadPDF: (formData: FormData) => {
+  uploadPDF: (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => {
     console.log('📡 API Base URL:', API_URL);
     console.log('📡 Full URL:', `${API_URL}/notes/upload-pdf-cloudinary`);
-    // Use Cloudinary upload endpoint
-    return api.post('/notes/upload-pdf-cloudinary', formData);
+    // Use Cloudinary upload endpoint with progress tracking
+    return api.post('/notes/upload-pdf-cloudinary', formData, {
+      timeout: 180000, // 3 minute timeout for uploads
+      onUploadProgress: onUploadProgress,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
 
   // Fallback to GridFS if needed
-  uploadPDFGridFS: (formData: FormData) => {
-    return api.post('/notes/upload-pdf', formData);
+  uploadPDFGridFS: (formData: FormData, onUploadProgress?: (progressEvent: any) => void) => {
+    return api.post('/notes/upload-pdf', formData, {
+      timeout: 180000,
+      onUploadProgress: onUploadProgress,
+    });
   },
 
   getUploadUrl: (data: {

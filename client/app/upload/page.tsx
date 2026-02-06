@@ -171,13 +171,13 @@ export default function UploadPage() {
     setError('');
   };
 
-  const validateForm = () => {
+  const validateForm = (): Record<string, string> => {
     const errors: Record<string, string> = {};
 
     if (!formData.title.trim()) {
       errors.title = 'Title is required';
-    } else if (formData.title.length < 5) {
-      errors.title = 'Title must be at least 5 characters';
+    } else if (formData.title.length < 3) {
+      errors.title = 'Title must be at least 3 characters';
     }
 
     if (!formData.description.trim()) {
@@ -203,7 +203,7 @@ export default function UploadPage() {
     }
 
     setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,8 +213,11 @@ export default function UploadPage() {
     setUploadProgress(0);
 
     // Validate form
-    if (!validateForm()) {
-      setError('Please fix the errors in the form');
+    const errors = validateForm();
+    if (Object.keys(errors).length > 0) {
+      // Collect specific error messages
+      const errorMessages = Object.values(errors);
+      setError(`Please fix: ${errorMessages.join(', ')}`);
       return;
     }
 
@@ -226,7 +229,7 @@ export default function UploadPage() {
       // Guard: selectedFile is checked by validateForm
       if (!selectedFile) return;
 
-      // First, upload the PDF file to GridFS
+      // First, upload the PDF file to Cloudinary
       const formDataUpload = new FormData();
       formDataUpload.append('pdf', selectedFile);
       
@@ -236,11 +239,16 @@ export default function UploadPage() {
       }
       
       console.log(' Uploading PDF to server...');
-      setUploadProgress(30);
-      const uploadResponse = await notesAPI.uploadPDF(formDataUpload);
+      
+      // Upload with progress tracking
+      const uploadResponse = await notesAPI.uploadPDF(formDataUpload, (progressEvent) => {
+        // Calculate actual upload progress (0-70%)
+        const percentCompleted = Math.round((progressEvent.loaded * 70) / progressEvent.total);
+        setUploadProgress(percentCompleted);
+      });
       console.log('✅ Upload response:', uploadResponse.data);
       
-      setUploadProgress(60);
+      setUploadProgress(75); // Upload complete, creating note
       
       // Handle both Cloudinary and GridFS responses
       const fileId = uploadResponse.data.fileId || uploadResponse.data.cloudinaryId;
@@ -268,10 +276,13 @@ export default function UploadPage() {
       };
 
       console.log('💾 Creating note entry...', noteData);
+      setUploadProgress(85); // Creating database entry
+      
       // Create note entry in database
       const response = await notesAPI.createNote(noteData as any);
       console.log('✅ Note created:', response.data);
 
+      setUploadProgress(100); // Complete!
       setSuccess(true);
       
       // Refresh user data to update upload count
@@ -310,18 +321,27 @@ export default function UploadPage() {
         console.error('❌ Server response data:', err.response.data);
       }
       
-      // Provide more helpful error messages
+      // Provide more helpful error messages based on error type
       const serverMessage = err.response?.data?.message;
       const errorCode = err.response?.data?.error;
       
       if (errorCode === 'DATABASE_NOT_CONNECTED' || serverMessage?.includes('MongoDB')) {
         setError('File upload is temporarily unavailable. The database is not connected. Please try again later or contact support.');
         setUploadsEnabled(false);
+      } else if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Upload timed out. Please check your internet connection and try again with a smaller file (under 5MB recommended).');
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Network error. Please check your internet connection and try again.');
+      } else if (err.response?.status === 413) {
+        setError('File is too large. Please compress your PDF (max 10MB) and try again.');
+      } else if (err.response?.status === 500) {
+        setError('Server error. Please try again in a few moments.');
       } else {
         setError(serverMessage || 'Failed to upload note. Please try again.');
       }
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -475,9 +495,10 @@ export default function UploadPage() {
                 value={formData.title}
                 onChange={handleInputChange}
                 placeholder="e.g. Data Structures Complete Notes"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${fieldErrors.title ? 'border-red-500' : 'border-gray-300'}`}
                 required
               />
+              {fieldErrors.title && <p className="text-red-500 text-sm mt-1">{fieldErrors.title}</p>}
             </div>
 
             {/* Description */}
@@ -587,7 +608,7 @@ export default function UploadPage() {
                   name="subject"
                   value={formData.subject}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${fieldErrors.subject ? 'border-red-500' : 'border-gray-300'}`}
                   required
                   disabled={!formData.branch || !formData.semester}
                 >
@@ -602,6 +623,7 @@ export default function UploadPage() {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.subject && <p className="text-red-500 text-sm mt-1">{fieldErrors.subject}</p>}
               </div>
             </div>
 

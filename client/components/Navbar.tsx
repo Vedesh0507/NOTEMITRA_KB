@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { BookOpen, User, LogOut, Upload, Menu, X, Shield } from 'lucide-react';
@@ -8,12 +9,21 @@ import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const { user, logout, loading } = useAuth();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // Prefetch common routes for faster navigation
+    if (typeof window !== 'undefined') {
+      router.prefetch('/browse');
+      router.prefetch('/upload');
+      router.prefetch('/profile');
+      router.prefetch('/leaderboard');
+    }
+  }, [router]);
 
   // Prevent hydration mismatch by not rendering user-dependent content until mounted
   const isReady = mounted && !loading;

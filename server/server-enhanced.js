@@ -1,6 +1,7 @@
 // Enhanced Node.js server with MongoDB support
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression'); // Add gzip compression
 const mongoose = require('mongoose');
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
@@ -16,6 +17,46 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// ============== PERFORMANCE OPTIMIZATIONS ==============
+
+// 1. Enable gzip compression for all responses (reduces payload by 70-90%)
+app.use(compression({
+  level: 6, // Balanced compression level
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    // Don't compress if client doesn't accept it
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
+
+// 2. Add cache headers middleware
+const cacheMiddleware = (duration) => (req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', `public, max-age=${duration}`);
+  }
+  next();
+};
+
+// 3. Keep-alive to prevent Render cold starts
+const KEEP_ALIVE_INTERVAL = 14 * 60 * 1000; // 14 minutes (Render sleeps after 15)
+let keepAliveTimer;
+const startKeepAlive = () => {
+  if (process.env.NODE_ENV === 'production' && process.env.RENDER_EXTERNAL_URL) {
+    keepAliveTimer = setInterval(async () => {
+      try {
+        const https = require('https');
+        https.get(`${process.env.RENDER_EXTERNAL_URL}/api/health`);
+        console.log('🔄 Keep-alive ping sent');
+      } catch (err) {
+        console.log('Keep-alive ping failed:', err.message);
+      }
+    }, KEEP_ALIVE_INTERVAL);
+  }
+};
+
+// ========================================================
 
 // Initialize Resend for emails (fallback) - only if API key is provided
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -456,6 +497,11 @@ async function connectMongoDB() {
       reportReason: String,
       createdAt: { type: Date, default: Date.now, index: true }
     });
+
+    // Compound indexes for faster browse queries
+    noteSchema.index({ branch: 1, semester: 1, subject: 1, createdAt: -1 });
+    noteSchema.index({ isApproved: 1, createdAt: -1 }); // For listing all approved notes
+    noteSchema.index({ userId: 1, createdAt: -1 }); // For user's notes
 
     const savedNoteSchema = new mongoose.Schema({
       userId: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User', index: true },
@@ -1900,6 +1946,9 @@ app.put('/api/admin/reports/:noteId/resolve', adminMiddleware, async (req, res) 
 // Notes routes
 app.get('/api/notes', async (req, res) => {
   try {
+    // Add cache header for better performance (cache for 30 seconds)
+    res.set('Cache-Control', 'public, max-age=30');
+    
     const { subject, semester, branch, page = 1, limit = 50 } = req.query;
     
     // Validate pagination parameters
@@ -4196,6 +4245,9 @@ async function startServer() {
         console.log('   See SETUP_GUIDE.md for Google Cloud setup');
         console.log('');
       }
+      
+      // Start keep-alive to prevent Render cold starts
+      startKeepAlive();
     });
     
     server.on('error', (err) => {
