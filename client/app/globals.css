@@ -93,108 +93,293 @@
   animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Hero Background Floating Animations */
-@keyframes float-slow {
+/* Hero Background - Floating Element Animations */
+@keyframes float-1 {
   0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-20px) rotate(3deg);
-  }
-}
-
-@keyframes float-medium {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-15px) rotate(-2deg);
-  }
-}
-
-@keyframes float-fast {
-  0%, 100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  50% {
-    transform: translateY(-12px) rotate(2deg);
-  }
-}
-
-@keyframes float-particle {
-  0%, 100% {
-    transform: translateY(0) translateX(0) scale(1);
-    opacity: 0.3;
+    transform: translateY(0) translateX(0) rotate(0deg);
   }
   25% {
-    transform: translateY(-10px) translateX(5px) scale(1.1);
-    opacity: 0.5;
+    transform: translateY(-15px) translateX(5px) rotate(2deg);
   }
   50% {
-    transform: translateY(-5px) translateX(-5px) scale(0.9);
-    opacity: 0.4;
+    transform: translateY(-25px) translateX(-3px) rotate(-1deg);
   }
   75% {
-    transform: translateY(-15px) translateX(3px) scale(1.05);
+    transform: translateY(-10px) translateX(8px) rotate(1deg);
+  }
+}
+
+@keyframes float-2 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(6deg);
+  }
+  33% {
+    transform: translateY(-20px) translateX(-8px) rotate(8deg);
+  }
+  66% {
+    transform: translateY(-12px) translateX(5px) rotate(4deg);
+  }
+}
+
+@keyframes float-3 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-18px) translateX(-10px) rotate(-3deg);
+  }
+}
+
+@keyframes float-4 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) rotate(-6deg);
+  }
+  40% {
+    transform: translateY(-22px) translateX(8px) rotate(-3deg);
+  }
+  80% {
+    transform: translateY(-8px) translateX(-5px) rotate(-8deg);
+  }
+}
+
+@keyframes float-5 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  50% {
+    transform: translateY(-16px) translateX(6px) scale(1.05);
+  }
+}
+
+@keyframes float-6 {
+  0%, 100% {
+    transform: translateY(0) rotate(45deg);
+  }
+  33% {
+    transform: translateY(-12px) rotate(50deg);
+  }
+  66% {
+    transform: translateY(-20px) rotate(40deg);
+  }
+}
+
+@keyframes float-7 {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-14px) scale(1.1);
+  }
+}
+
+/* Particle animations */
+@keyframes particle-1 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.4;
+  }
+  25% {
+    transform: translateY(-20px) translateX(10px) scale(1.2);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translateY(-35px) translateX(-5px) scale(0.9);
+    opacity: 0.5;
+  }
+  75% {
+    transform: translateY(-15px) translateX(15px) scale(1.1);
+    opacity: 0.45;
+  }
+}
+
+@keyframes particle-2 {
+  0%, 100% {
+    transform: translateY(0) translateX(0) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-30px) translateX(12px) scale(1.15);
+    opacity: 0.55;
+  }
+}
+
+@keyframes particle-3 {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.4;
+  }
+  33% {
+    transform: translateY(-25px) translateX(-8px);
+    opacity: 0.6;
+  }
+  66% {
+    transform: translateY(-10px) translateX(10px);
+    opacity: 0.45;
+  }
+}
+
+@keyframes particle-4 {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-20px) scale(1.3);
+    opacity: 0.5;
+  }
+}
+
+@keyframes particle-5 {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: translateY(-18px) translateX(6px);
+    opacity: 0.5;
+  }
+  80% {
+    transform: translateY(-28px) translateX(-4px);
     opacity: 0.35;
   }
 }
 
-@keyframes pulse-slow {
+@keyframes particle-6 {
   0%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
+    transform: translateY(0) scale(1);
+    opacity: 0.35;
   }
   50% {
-    opacity: 0.6;
-    transform: scale(1.05);
+    transform: translateY(-22px) scale(1.2);
+    opacity: 0.55;
   }
 }
 
-.animate-float-slow {
-  animation: float-slow 8s ease-in-out infinite;
+/* Sparkle animations */
+@keyframes sparkle-1 {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.6;
+  }
+  25% {
+    transform: scale(1.3) rotate(15deg);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(0.8) rotate(-10deg);
+    opacity: 0.4;
+  }
+  75% {
+    transform: scale(1.1) rotate(5deg);
+    opacity: 0.7;
+  }
 }
 
-.animate-float-medium {
-  animation: float-medium 6s ease-in-out infinite;
+@keyframes sparkle-2 {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.4) rotate(-20deg);
+    opacity: 0.8;
+  }
 }
 
-.animate-float-fast {
-  animation: float-fast 4s ease-in-out infinite;
+@keyframes sparkle-3 {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.5;
+  }
+  33% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  66% {
+    transform: scale(0.7);
+    opacity: 0.3;
+  }
 }
 
-.animate-float-particle {
-  animation: float-particle 5s ease-in-out infinite;
+/* Gradient orb animations */
+@keyframes orb-1 {
+  0%, 100% {
+    transform: translate(-30%, -30%) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(-20%, -20%) scale(1.1);
+    opacity: 0.3;
+  }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 6s ease-in-out infinite;
+@keyframes orb-2 {
+  0%, 100% {
+    transform: translate(30%, 30%) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate(20%, 20%) scale(1.15);
+    opacity: 0.25;
+  }
 }
 
-/* Animation delays */
-.delay-300 {
-  animation-delay: 300ms;
+@keyframes orb-3 {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.2;
+  }
 }
 
-.delay-500 {
-  animation-delay: 500ms;
-}
+/* Animation classes */
+.animate-float-1 { animation: float-1 6s ease-in-out infinite; }
+.animate-float-2 { animation: float-2 7s ease-in-out infinite; }
+.animate-float-3 { animation: float-3 5s ease-in-out infinite; }
+.animate-float-4 { animation: float-4 8s ease-in-out infinite; }
+.animate-float-5 { animation: float-5 6.5s ease-in-out infinite; }
+.animate-float-6 { animation: float-6 5.5s ease-in-out infinite; }
+.animate-float-7 { animation: float-7 4s ease-in-out infinite; }
 
-.delay-700 {
-  animation-delay: 700ms;
-}
+.animate-particle-1 { animation: particle-1 4s ease-in-out infinite; }
+.animate-particle-2 { animation: particle-2 5s ease-in-out infinite 0.5s; }
+.animate-particle-3 { animation: particle-3 4.5s ease-in-out infinite 1s; }
+.animate-particle-4 { animation: particle-4 3.5s ease-in-out infinite 0.3s; }
+.animate-particle-5 { animation: particle-5 5.5s ease-in-out infinite 0.8s; }
+.animate-particle-6 { animation: particle-6 4s ease-in-out infinite 1.2s; }
 
-.delay-1000 {
-  animation-delay: 1000ms;
-}
+.animate-sparkle-1 { animation: sparkle-1 3s ease-in-out infinite; }
+.animate-sparkle-2 { animation: sparkle-2 4s ease-in-out infinite 0.5s; }
+.animate-sparkle-3 { animation: sparkle-3 3.5s ease-in-out infinite 1s; }
+
+.animate-orb-1 { animation: orb-1 10s ease-in-out infinite; }
+.animate-orb-2 { animation: orb-2 12s ease-in-out infinite; }
+.animate-orb-3 { animation: orb-3 8s ease-in-out infinite; }
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .animate-float-slow,
-  .animate-float-medium,
-  .animate-float-fast,
-  .animate-float-particle,
-  .animate-pulse-slow {
+  .animate-float-1,
+  .animate-float-2,
+  .animate-float-3,
+  .animate-float-4,
+  .animate-float-5,
+  .animate-float-6,
+  .animate-float-7,
+  .animate-particle-1,
+  .animate-particle-2,
+  .animate-particle-3,
+  .animate-particle-4,
+  .animate-particle-5,
+  .animate-particle-6,
+  .animate-sparkle-1,
+  .animate-sparkle-2,
+  .animate-sparkle-3,
+  .animate-orb-1,
+  .animate-orb-2,
+  .animate-orb-3 {
     animation: none;
   }
 }
