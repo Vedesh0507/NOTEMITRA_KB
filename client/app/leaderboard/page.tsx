@@ -61,10 +61,31 @@ export default function LeaderboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading leaderboard...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 py-6 sm:py-8 px-4">
+        <div className="max-w-5xl mx-auto">
+          {/* Skeleton Header */}
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="h-10 w-64 bg-gray-200 rounded-lg mx-auto mb-4 animate-pulse"></div>
+            <div className="h-6 w-96 max-w-full bg-gray-200 rounded mx-auto animate-pulse"></div>
+          </div>
+          {/* Skeleton Cards */}
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border animate-pulse">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-200 rounded-full"></div>
+                  <div className="flex-1">
+                    <div className="h-5 w-40 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 w-24 bg-gray-200 rounded"></div>
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="h-10 w-20 bg-gray-200 rounded"></div>
+                    <div className="h-10 w-20 bg-gray-200 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );

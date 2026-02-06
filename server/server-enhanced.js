@@ -1674,6 +1674,9 @@ const adminMiddleware = async (req, res, next) => {
 // Get platform statistics
 app.get('/api/admin/stats', adminMiddleware, async (req, res) => {
   try {
+    // Cache for 30 seconds - admin stats can be slightly delayed
+    res.set('Cache-Control', 'private, max-age=30');
+    
     if (useMongoDB) {
       const totalUsers = await User.countDocuments();
       const totalNotes = await Note.countDocuments();
@@ -4063,6 +4066,9 @@ app.delete('/api/comments/:commentId', async (req, res) => {
 // Leaderboard endpoint - calculates stats from actual notes
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    // Cache for 60 seconds - leaderboard doesn't need real-time updates
+    res.set('Cache-Control', 'public, max-age=60');
+    
     if (useMongoDB) {
       // MongoDB version - aggregate actual data from notes collection
       const noteStats = await Note.aggregate([

@@ -96,10 +96,35 @@ export default function UsersManagement() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 pt-20 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading users...</p>
+      <div className="min-h-screen bg-gray-50 pt-20">
+        <div className="max-w-7xl mx-auto px-4 py-8">
+          {/* Header skeleton */}
+          <div className="mb-8">
+            <div className="h-5 w-32 bg-gray-200 rounded animate-pulse mb-4"></div>
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          {/* Table skeleton */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="p-4 border-b bg-gray-50">
+              <div className="flex gap-4">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                ))}
+              </div>
+            </div>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="p-4 border-b flex items-center gap-4">
+                <div className="h-10 w-10 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-3 w-48 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+                <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
