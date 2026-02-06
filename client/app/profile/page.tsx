@@ -21,7 +21,8 @@ import {
   TrendingUp,
   X,
   Loader2,
-  Check
+  Check,
+  Trash2
 } from 'lucide-react';
 import { notesAPI, authAPI } from '@/lib/api';
 
@@ -65,6 +66,8 @@ export default function ProfilePage() {
     rollNo: ''
   });
   const [unsavingNoteId, setUnsavingNoteId] = useState<string | null>(null);
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -360,34 +363,94 @@ export default function ProfilePage() {
                   {uploadedNotes.map((note) => (
                     <div
                       key={note.id}
-                      onClick={() => router.push(`/notes/${note.id}`)}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition relative group"
                     >
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                        {note.title}
-                      </h3>
-                      <div className="flex items-center gap-2 mb-3">
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                          {note.subject}
-                        </span>
-                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                          Sem {note.semester}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm text-gray-600">
-                        <div className="flex items-center gap-3">
-                          <span className="flex items-center gap-1">
-                            <Eye className="w-4 h-4" />
-                            {note.views}
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowDeleteConfirm(String(note.id));
+                        }}
+                        className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-gray-500 hover:text-red-500"
+                        title="Delete note"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      
+                      {/* Delete Confirmation */}
+                      {showDeleteConfirm === String(note.id) && (
+                        <div className="absolute inset-0 bg-white bg-opacity-95 rounded-lg flex flex-col items-center justify-center z-10 p-4">
+                          <p className="text-sm text-gray-700 mb-3 text-center">Delete this note permanently?</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDeleteConfirm(null);
+                              }}
+                              className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const noteId = String(note.id);
+                                setDeletingNoteId(noteId);
+                                try {
+                                  await notesAPI.deleteNote(noteId);
+                                  setUploadedNotes(prev => prev.filter(n => String(n.id) !== noteId));
+                                  setShowDeleteConfirm(null);
+                                } catch (err) {
+                                  console.error('Failed to delete:', err);
+                                  alert('Failed to delete note. Please try again.');
+                                } finally {
+                                  setDeletingNoteId(null);
+                                }
+                              }}
+                              disabled={deletingNoteId === String(note.id)}
+                              className="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition flex items-center gap-1 disabled:opacity-50"
+                            >
+                              {deletingNoteId === String(note.id) ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div 
+                        onClick={() => router.push(`/notes/${note.id}`)}
+                        className="cursor-pointer"
+                      >
+                        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 pr-8">
+                          {note.title}
+                        </h3>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {note.subject}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Download className="w-4 h-4" />
-                            {note.downloads}
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                            Sem {note.semester}
                           </span>
-                          <span className="flex items-center gap-1 text-red-500">
-                            <Heart className="w-4 h-4" />
-                            {note.upvotes}
-                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center gap-3">
+                            <span className="flex items-center gap-1">
+                              <Eye className="w-4 h-4" />
+                              {note.views}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Download className="w-4 h-4" />
+                              {note.downloads}
+                            </span>
+                            <span className="flex items-center gap-1 text-red-500">
+                              <Heart className="w-4 h-4" />
+                              {note.upvotes}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
