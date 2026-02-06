@@ -193,23 +193,29 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-12 sm:py-16 lg:py-20 px-4 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold mb-4 sm:mb-6">
-            Join Our Community Today
+      {/* CTA Section - Compact & Clean */}
+      <section className="py-8 sm:py-10 lg:py-12 px-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white relative overflow-hidden">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-0 w-40 h-40 bg-white rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
+        </div>
+        
+        <div className="max-w-2xl mx-auto text-center relative z-10">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2">
+            Join NoteMitra Today
           </h2>
-          <p className="text-base sm:text-lg lg:text-xl mb-6 sm:mb-8 opacity-90">
+          <p className="text-sm sm:text-base mb-4 sm:mb-5 opacity-90">
             Start sharing and discovering quality academic notes
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
+          <div className="flex flex-row gap-3 justify-center">
             <Link href="/auth/signup">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6">
+              <Button size="default" className="bg-white text-blue-600 hover:bg-gray-100 font-semibold px-4 sm:px-6 py-2.5 shadow-lg">
                 Create Account
               </Button>
             </Link>
             <Link href="/browse">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-base sm:text-lg px-6 sm:px-8 py-4 sm:py-6 bg-transparent border-2 border-white text-white hover:bg-white hover:text-blue-600">
+              <Button size="default" variant="outline" className="bg-transparent border-2 border-white/80 text-white hover:bg-white/10 font-semibold px-4 sm:px-6 py-2.5">
                 Browse Notes
               </Button>
             </Link>
