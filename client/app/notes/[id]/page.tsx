@@ -67,6 +67,7 @@ export default function NoteDetailPage() {
   const [commentText, setCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [isLiking, setIsLiking] = useState(false); // Prevent rapid clicks
   const [isSaved, setIsSaved] = useState(false);
   const [savingNote, setSavingNote] = useState(false);
 
@@ -467,8 +468,10 @@ export default function NoteDetailPage() {
       return;
     }
 
-    if (!note) return;
+    if (!note || isLiking) return; // Prevent rapid clicks
 
+    setIsLiking(true);
+    
     // Optimistic UI update for instant feedback
     const wasLiked = isLiked;
     setIsLiked(!wasLiked);
@@ -498,6 +501,8 @@ export default function NoteDetailPage() {
         ...prev,
         upvotes: wasLiked ? prev.upvotes + 1 : prev.upvotes - 1
       } : prev);
+    } finally {
+      setIsLiking(false);
     }
   };
 
@@ -700,7 +705,12 @@ export default function NoteDetailPage() {
               {/* Like Button - Instagram style */}
               <button
                 onClick={handleLike}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-all duration-200 active:scale-95"
+                disabled={isLiking}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all duration-200 active:scale-95 ${
+                  isLiking 
+                    ? 'bg-gray-200 cursor-not-allowed opacity-70' 
+                    : 'bg-gray-100 hover:bg-gray-200'
+                }`}
               >
                 <Heart
                   className={`w-5 h-5 transition-all duration-200 ${

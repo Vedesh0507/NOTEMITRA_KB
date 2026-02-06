@@ -450,6 +450,7 @@ async function connectMongoDB() {
       upvotes: { type: Number, default: 0 },
       downvotes: { type: Number, default: 0 },
       likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track who liked
+      viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track unique viewers
       isApproved: { type: Boolean, default: true },
       isReported: { type: Boolean, default: false },
       reportReason: String,
@@ -938,9 +939,12 @@ app.get('/api/auth/me', async (req, res) => {
         return res.status(404).json({ message: 'User not found. Your account may have been deleted' });
       }
 
-      // Calculate totals from user's notes
+      // Calculate ALL stats from actual notes (no stale user document data)
       const totalViews = userNotes.reduce((sum, note) => sum + (note.views || 0), 0);
       const totalUpvotes = userNotes.reduce((sum, note) => sum + (note.upvotes || 0), 0);
+      const totalDownloads = userNotes.reduce((sum, note) => sum + (note.downloads || 0), 0);
+      // Reputation = 10 points per like received
+      const reputation = totalUpvotes * 10;
 
       res.json({
         user: { 
@@ -952,9 +956,9 @@ app.get('/api/auth/me', async (req, res) => {
           section: user.section,
           rollNo: user.rollNo,
           isAdmin: user.isAdmin,
-          reputation: user.reputation || 0,
+          reputation: reputation,
           uploadsCount: notesCount,
-          totalDownloads: user.totalDownloads || 0,
+          totalDownloads: totalDownloads,
           totalViews: totalViews,
           totalUpvotes: totalUpvotes,
           savedNotesCount: savedNotesCount
@@ -2989,7 +2993,7 @@ app.get('/api/notes/:id', async (req, res) => {
       return res.status(400).json({ message: 'Note ID is required' });
     }
 
-    // Extract user ID from token if present (for checking if user liked)
+    // Extract user ID from token if present (for checking if user liked/viewed)
     let currentUserId = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer dev_token_')) {
@@ -3002,20 +3006,40 @@ app.get('/api/notes/:id', async (req, res) => {
         return res.status(400).json({ message: 'Invalid note ID format. Must be a valid MongoDB ObjectId' });
       }
 
-      // MongoDB version
-      const note = await Note.findByIdAndUpdate(
-        noteId,
-        { $inc: { views: 1 } },
-        { new: true }
-      ).lean();
+      // First, get the note to check if user already viewed
+      let note = await Note.findById(noteId).lean();
 
       if (!note) {
         return res.status(404).json({ message: 'Note not found with the provided ID' });
       }
 
-      // Update user's total views
-      if (note.userId) {
-        await User.findByIdAndUpdate(note.userId, { $inc: { totalViews: 1 } });
+      // Only increment views if user hasn't viewed before (unique views)
+      let isNewView = true;
+      if (currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
+        const userObjectId = new mongoose.Types.ObjectId(currentUserId);
+        // Check if user already viewed
+        if (note.viewedBy && note.viewedBy.some(id => id.toString() === currentUserId)) {
+          isNewView = false;
+        }
+        
+        if (isNewView) {
+          // Add to viewedBy and increment views
+          note = await Note.findByIdAndUpdate(
+            noteId,
+            { 
+              $inc: { views: 1 },
+              $addToSet: { viewedBy: userObjectId }
+            },
+            { new: true }
+          ).lean();
+        }
+      } else {
+        // Anonymous user - still count the view (can't track without user ID)
+        note = await Note.findByIdAndUpdate(
+          noteId,
+          { $inc: { views: 1 } },
+          { new: true }
+        ).lean();
       }
 
       // Check if current user has liked this note
