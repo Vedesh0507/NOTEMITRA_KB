@@ -82,23 +82,14 @@ export default function PDFPreviewPage() {
     };
   }, [noteId]);
 
-  // Auto-switch to Google Docs Viewer after timeout (for direct URLs only)
+  // Show error if Google Docs Viewer takes too long to load
   useEffect(() => {
-    if (pdfLoading && pdfUrl && originalPdfUrl) {
-      const isGoogleViewer = pdfUrl.includes('docs.google.com');
-      
+    if (pdfLoading && pdfUrl) {
       pdfLoadTimeoutRef.current = setTimeout(() => {
-        if (isGoogleViewer) {
-          // Already using Google Docs and still not loaded - show error with options
-          console.log('Google Docs Viewer timeout - showing error options');
-          setPdfLoading(false);
-          setPdfError(true);
-        } else {
-          // Direct URL failed - try Google Docs Viewer
-          console.log('Direct PDF load timeout - switching to Google Docs Viewer');
-          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
-        }
-      }, isGoogleViewer ? 12000 : 8000); // Give Google Docs more time
+        console.log('PDF preview timeout - showing error options');
+        setPdfLoading(false);
+        setPdfError(true);
+      }, 15000); // 15 second timeout
     }
     
     return () => {
@@ -106,7 +97,7 @@ export default function PDFPreviewPage() {
         clearTimeout(pdfLoadTimeoutRef.current);
       }
     };
-  }, [pdfLoading, pdfUrl, originalPdfUrl]);
+  }, [pdfLoading, pdfUrl]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -140,34 +131,24 @@ export default function PDFPreviewPage() {
         }
         setNote(fetchedNote);
         
-        // Set PDF URL - prioritize direct URLs for faster loading
+        // Set PDF URL - use Google Docs Viewer for all to prevent auto-download
         let rawPdfUrl = '';
-        let useGoogleViewer = false;
         
         if (fetchedNote.cloudinaryUrl) {
-          // Cloudinary URLs work directly in iframes
           rawPdfUrl = fetchedNote.cloudinaryUrl;
         } else if (fetchedNote.fileUrl) {
-          // External file URLs work directly
           rawPdfUrl = fetchedNote.fileUrl;
         } else if (fetchedNote.fileId) {
-          // GridFS files - use Google Docs Viewer for reliable cross-browser support
           const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
           rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
-          useGoogleViewer = true; // GridFS needs Google Viewer for reliability
         }
         
         if (rawPdfUrl) {
           // Store original URL for downloads
           setOriginalPdfUrl(rawPdfUrl);
           
-          if (useGoogleViewer) {
-            // Use Google Docs Viewer for GridFS files (more reliable)
-            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
-          } else {
-            // Use direct URL for Cloudinary/external URLs (faster)
-            setPdfUrl(rawPdfUrl);
-          }
+          // Always use Google Docs Viewer for preview to prevent auto-download
+          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
           setPdfLoading(true);
           setPdfError(false);
         }
@@ -275,7 +256,11 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
       console.log('📥 Downloading PDF with filename:', filename);
       
       // Fetch the PDF as blob
-      const response = await fetch(originalPdfUrl);
+      const response = await fetch(originalPdfUrl, {
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
       if (!response.ok) {
         throw new Error(`Failed to fetch PDF: ${response.status}`);
       }
@@ -284,24 +269,43 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
       const pdfBlob = new Blob([blob], { type: 'application/pdf' });
       const blobUrl = window.URL.createObjectURL(pdfBlob);
       
-      // Create download link
+      // Create download link with proper attributes
       const link = document.createElement('a');
       link.href = blobUrl;
       link.download = filename;
+      link.type = 'application/pdf';
       link.style.display = 'none';
       document.body.appendChild(link);
-      link.click();
+      
+      // For mobile, trigger click differently
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        const clickEvent = new MouseEvent('click', {
+          view: window,
+          bubbles: true,
+          cancelable: true
+        });
+        link.dispatchEvent(clickEvent);
+      } else {
+        link.click();
+      }
       
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(blobUrl);
-      }, 5000);
+      }, 10000);
       
       console.log('✅ Download initiated');
     } catch (error) {
       console.error('Download error:', error);
-      // Fallback: open in new tab
-      window.open(originalPdfUrl, '_blank');
+      // Fallback: Navigate to download endpoint
+      if (note._id || note.id) {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+        window.location.href = `${apiBase}/notes/${note._id || note.id}/download`;
+      } else {
+        window.open(originalPdfUrl, '_blank');
+      }
     }
   };
 
