@@ -6,6 +6,7 @@ import { BookOpen, Upload, Users, Sparkles, TrendingUp, Shield, Search, Download
 import { useAuth } from '@/lib/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import HeroBackground from '@/components/HeroBackground';
 
 export default function HomePage() {
   const { user } = useAuth();
@@ -23,35 +24,66 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative min-h-[600px] md:min-h-[700px] flex items-center justify-center py-24 px-4 overflow-hidden bg-gradient-to-b from-blue-50 via-indigo-50 to-white">
+      <section className="relative min-h-[550px] md:min-h-[650px] flex items-center justify-center py-16 md:py-24 px-4 overflow-hidden">
+        {/* Animated Background */}
+        <HeroBackground />
+        
         {/* Content */}
-        <div className="relative z-10 max-w-7xl mx-auto w-full">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
-              Your Academic Success<br />
-              <span className="text-blue-600">Starts Here</span>
+        <div className="relative z-10 max-w-5xl mx-auto w-full">
+          <div className="text-center max-w-3xl mx-auto px-2">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100/80 backdrop-blur-sm rounded-full mb-4 md:mb-6">
+              <Sparkles className="w-4 h-4 text-blue-600" />
+              <span className="text-xs md:text-sm font-medium text-blue-700">Trusted by 1000+ Students</span>
+            </div>
+            
+            {/* Main Headline - Mobile optimized */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-4 md:mb-6 leading-tight tracking-tight">
+              Your Academic Success
+              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+                Starts Here
+              </span>
             </h1>
-            <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
-              <strong className="text-gray-900">NoteMitra</strong> is your trusted platform for sharing and discovering high-quality academic notes. 
-              Connect with fellow students, access verified study materials, and build your academic reputation. 
-              Whether you're looking to share your knowledge or find the perfect study resources, NoteMitra makes 
-              learning collaborative, efficient, and rewarding.
+            
+            {/* Subtitle - Clear and concise */}
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 mb-6 md:mb-8 leading-relaxed max-w-2xl mx-auto">
+              Share, discover, and ace your exams with{' '}
+              <strong className="text-gray-900 font-semibold">NoteMitra</strong> — 
+              the platform where students help students succeed.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/auth/signup">
-                <Button size="lg" className="w-full sm:w-auto text-lg px-8 py-6 bg-blue-600 hover:bg-blue-700 shadow-lg">
-                  Create Account
+            
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center items-center">
+              <Link href="/auth/signup" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full sm:w-auto text-base md:text-lg px-6 md:px-8 py-5 md:py-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-500/25 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-0.5">
+                  Get Started Free
                 </Button>
               </Link>
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="w-full sm:w-auto text-lg px-8 py-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm"
+                className="w-full sm:w-auto text-base md:text-lg px-6 md:px-8 py-5 md:py-6 border-2 border-gray-200 bg-white/80 backdrop-blur-sm text-gray-700 hover:bg-white hover:border-gray-300 shadow-sm transition-all duration-300"
                 onClick={handleExploreClick}
               >
-                <Search className="mr-2 h-5 w-5" />
+                <Search className="mr-2 h-4 w-4 md:h-5 md:w-5" />
                 Explore Notes
               </Button>
+            </div>
+            
+            {/* Trust indicators */}
+            <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 mt-8 md:mt-10 text-xs md:text-sm text-gray-500">
+              <div className="flex items-center gap-1.5">
+                <Shield className="w-4 h-4 text-green-500" />
+                <span>Verified Notes</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4 text-blue-500" />
+                <span>Active Community</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Download className="w-4 h-4 text-purple-500" />
+                <span>Free Downloads</span>
+              </div>
             </div>
           </div>
         </div>

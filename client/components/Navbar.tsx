@@ -31,13 +31,80 @@ export default function Navbar() {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm" role="navigation" aria-label="Main navigation">
+    <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50 shadow-sm" role="navigation" aria-label="Main navigation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2" aria-label="NoteMitra Home">
-            <BookOpen className="h-8 w-8 text-blue-600" aria-hidden="true" />
-            <span className="text-xl font-bold text-gray-900">NoteMitra</span>
+          {/* Logo - Enhanced Branding */}
+          <Link href="/" className="flex items-center gap-2.5 group" aria-label="NoteMitra Home">
+            {/* Premium Logo SVG */}
+            <div className="relative">
+              <svg 
+                className="w-9 h-9 md:w-10 md:h-10 transition-transform duration-300 group-hover:scale-105" 
+                viewBox="0 0 48 48" 
+                fill="none"
+                aria-hidden="true"
+              >
+                {/* Book base */}
+                <defs>
+                  <linearGradient id="bookGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#3B82F6" />
+                    <stop offset="100%" stopColor="#6366F1" />
+                  </linearGradient>
+                  <linearGradient id="pageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#EEF2FF" />
+                    <stop offset="100%" stopColor="#E0E7FF" />
+                  </linearGradient>
+                </defs>
+                
+                {/* Open book shape */}
+                <path 
+                  d="M6 12C6 10.8954 6.89543 10 8 10H20C22.2091 10 24 11.7909 24 14V38C24 36.8954 23.1046 36 22 36H8C6.89543 36 6 35.1046 6 34V12Z" 
+                  fill="url(#bookGradient)"
+                />
+                <path 
+                  d="M42 12C42 10.8954 41.1046 10 40 10H28C25.7909 10 24 11.7909 24 14V38C24 36.8954 24.8954 36 26 36H40C41.1046 36 42 35.1046 42 34V12Z" 
+                  fill="url(#bookGradient)"
+                />
+                
+                {/* Book pages highlight */}
+                <path 
+                  d="M8 12H18C20.2091 12 22 13.7909 22 16V36H8V12Z" 
+                  fill="url(#pageGradient)"
+                  opacity="0.5"
+                />
+                <path 
+                  d="M40 12H30C27.7909 12 26 13.7909 26 16V36H40V12Z" 
+                  fill="url(#pageGradient)"
+                  opacity="0.5"
+                />
+                
+                {/* Note lines */}
+                <line x1="10" y1="18" x2="18" y2="18" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="10" y1="23" x2="16" y2="23" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="10" y1="28" x2="17" y2="28" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                
+                <line x1="30" y1="18" x2="38" y2="18" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="32" y1="23" x2="38" y2="23" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1="31" y1="28" x2="38" y2="28" stroke="#6366F1" strokeWidth="1.5" strokeLinecap="round" />
+                
+                {/* Center binding */}
+                <path d="M24 10V38" stroke="#4F46E5" strokeWidth="2" />
+                
+                {/* Sparkle/star accent */}
+                <circle cx="38" cy="8" r="2" fill="#FBBF24" />
+                <path d="M38 5V11M35 8H41" stroke="#FBBF24" strokeWidth="1" strokeLinecap="round" />
+              </svg>
+            </div>
+            
+            {/* Brand Name */}
+            <div className="flex flex-col">
+              <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent tracking-tight">
+                NoteMitra
+              </span>
+              <span className="text-[9px] md:text-[10px] text-gray-500 font-medium -mt-0.5 tracking-wide hidden sm:block">
+                STUDENT NOTES PLATFORM
+              </span>
+            </div>
           </Link>
 
           {/* Desktop Navigation */}
