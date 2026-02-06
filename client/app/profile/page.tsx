@@ -11,8 +11,9 @@ import {
   Upload,
   Download,
   Eye,
-  ThumbsUp,
-  BookmarkPlus,
+  Heart,
+  Bookmark,
+  BookmarkX,
   Edit,
   Award,
   FileText,
@@ -63,6 +64,7 @@ export default function ProfilePage() {
     section: '',
     rollNo: ''
   });
+  const [unsavingNoteId, setUnsavingNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
@@ -270,10 +272,10 @@ export default function ProfilePage() {
 
               <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 sm:p-4 text-center hidden sm:block">
                 <div className="flex justify-center mb-1 sm:mb-2">
-                  <ThumbsUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
                 </div>
                 <div className="text-lg sm:text-2xl font-bold text-orange-900">{totalUpvotes}</div>
-                <div className="text-[10px] sm:text-sm text-orange-700">Upvotes</div>
+                <div className="text-[10px] sm:text-sm text-orange-700">Likes</div>
               </div>
 
               <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 sm:p-4 text-center hidden sm:block">
@@ -289,10 +291,10 @@ export default function ProfilePage() {
             <div className="grid grid-cols-2 gap-2 mt-2 sm:hidden">
               <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 text-center">
                 <div className="flex justify-center mb-1">
-                  <ThumbsUp className="w-5 h-5 text-orange-600" />
+                  <Heart className="w-5 h-5 text-red-500" />
                 </div>
                 <div className="text-lg font-bold text-orange-900">{totalUpvotes}</div>
-                <div className="text-[10px] text-orange-700">Upvotes</div>
+                <div className="text-[10px] text-orange-700">Likes</div>
               </div>
               <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 text-center">
                 <div className="flex justify-center mb-1">
@@ -329,7 +331,7 @@ export default function ProfilePage() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
-                <BookmarkPlus className="w-5 h-5 inline-block mr-2" />
+                <Bookmark className="w-5 h-5 inline-block mr-2" />
                 Saved Notes ({savedNotes.length})
               </button>
             </div>
@@ -382,8 +384,8 @@ export default function ProfilePage() {
                             <Download className="w-4 h-4" />
                             {note.downloads}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <ThumbsUp className="w-4 h-4" />
+                          <span className="flex items-center gap-1 text-red-500">
+                            <Heart className="w-4 h-4" />
                             {note.upvotes}
                           </span>
                         </div>
@@ -394,7 +396,7 @@ export default function ProfilePage() {
               )
             ) : savedNotes.length === 0 ? (
               <div className="text-center py-12">
-                <BookmarkPlus className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                <Bookmark className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">No saved notes yet</h3>
                 <p className="text-gray-600 mb-4">Bookmark notes you want to read later!</p>
                 <Button onClick={() => router.push('/browse')}>
@@ -406,34 +408,64 @@ export default function ProfilePage() {
                 {savedNotes.map((note: any) => (
                   <div
                     key={note._id || note.id}
-                    onClick={() => router.push(`/notes/${note._id || note.id}`)}
-                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                    className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition relative group"
                   >
-                    <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
-                      {note.title}
-                    </h3>
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        {note.subject}
-                      </span>
-                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                        Sem {note.semester}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm text-gray-600">
-                      <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1">
-                          <Eye className="w-4 h-4" />
-                          {note.views || 0}
+                    {/* Unsave Button */}
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const noteId = note._id || note.id;
+                        setUnsavingNoteId(noteId);
+                        try {
+                          await notesAPI.unsaveNote(noteId);
+                          setSavedNotes(prev => prev.filter((n: any) => (n._id || n.id) !== noteId));
+                        } catch (err) {
+                          console.error('Failed to unsave:', err);
+                        } finally {
+                          setUnsavingNoteId(null);
+                        }
+                      }}
+                      disabled={unsavingNoteId === (note._id || note.id)}
+                      className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 text-gray-500 hover:text-red-500 disabled:opacity-50"
+                      title="Unsave note"
+                    >
+                      {unsavingNoteId === (note._id || note.id) ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <BookmarkX className="w-4 h-4" />
+                      )}
+                    </button>
+                    
+                    <div 
+                      onClick={() => router.push(`/notes/${note._id || note.id}`)}
+                      className="cursor-pointer"
+                    >
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 pr-8">
+                        {note.title}
+                      </h3>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                          {note.subject}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <Download className="w-4 h-4" />
-                          {note.downloads || 0}
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
+                          Sem {note.semester}
                         </span>
-                        <span className="flex items-center gap-1">
-                          <ThumbsUp className="w-4 h-4" />
-                          {note.upvotes || 0}
-                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div className="flex items-center gap-3">
+                          <span className="flex items-center gap-1">
+                            <Eye className="w-4 h-4" />
+                            {note.views || 0}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Download className="w-4 h-4" />
+                            {note.downloads || 0}
+                          </span>
+                          <span className="flex items-center gap-1 text-red-500">
+                            <Heart className="w-4 h-4" />
+                            {note.upvotes || 0}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

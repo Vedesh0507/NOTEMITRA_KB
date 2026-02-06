@@ -14,10 +14,12 @@ import {
   FileText,
   Flag,
   Share2,
+  Bookmark,
   BookmarkPlus,
   Send,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
 
@@ -529,12 +531,30 @@ export default function NoteDetailPage() {
     }
   };
 
-  const handleSaveNote = () => {
+  const handleSaveNote = async () => {
     if (!user) {
       router.push('/auth/signin');
       return;
     }
-    alert('Bookmark functionality will be implemented');
+    
+    try {
+      setSavingNote(true);
+      if (isSaved) {
+        await notesAPI.unsaveNote(noteId);
+        setIsSaved(false);
+      } else {
+        await notesAPI.saveNote(noteId);
+        setIsSaved(true);
+      }
+    } catch (error: any) {
+      console.error('Failed to save/unsave note:', error);
+      // Show specific error for already saved
+      if (error.response?.status === 409) {
+        setIsSaved(true); // Note is already saved
+      }
+    } finally {
+      setSavingNote(false);
+    }
   };
 
   const handleReport = () => {
@@ -695,8 +715,20 @@ export default function NoteDetailPage() {
               </button>
 
               {/* Save */}
-              <Button variant="outline" size="sm" onClick={handleSaveNote}>
-                <BookmarkPlus className="w-4 h-4" />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleSaveNote}
+                disabled={savingNote}
+                className={isSaved ? 'bg-blue-50 border-blue-300 text-blue-600' : ''}
+              >
+                {savingNote ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isSaved ? (
+                  <Bookmark className="w-4 h-4 fill-current" />
+                ) : (
+                  <BookmarkPlus className="w-4 h-4" />
+                )}
               </Button>
 
               {/* Share */}
