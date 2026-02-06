@@ -2354,13 +2354,16 @@ app.get('/api/notes/view-pdf/:fileId', async (req, res) => {
     }
     const encodedFilename = encodeURIComponent(sanitizedFilename).replace(/['()]/g, escape);
 
-    // Set proper headers for PDF inline viewing
+    // Set proper headers for PDF inline viewing with CORS support
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `inline; filename="${sanitizedFilename}"; filename*=UTF-8''${encodedFilename}`,
       'Content-Length': files.length,
       'Cache-Control': 'public, max-age=31536000',
-      'Accept-Ranges': 'bytes'
+      'Accept-Ranges': 'bytes',
+      'X-Content-Type-Options': 'nosniff',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Expose-Headers': 'Content-Length, Content-Disposition'
     });
 
     // Stream the file

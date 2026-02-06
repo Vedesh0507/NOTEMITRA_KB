@@ -55,6 +55,8 @@ export default function PDFPreviewPage() {
   const [loading, setLoading] = useState(true);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState(false);
   
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -64,12 +66,46 @@ export default function PDFPreviewPage() {
   const [queriesLeft, setQueriesLeft] = useState(30);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pdfLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (noteId) {
       fetchNoteDetails();
     }
+    
+    // Cleanup timeout on unmount
+    return () => {
+      if (pdfLoadTimeoutRef.current) {
+        clearTimeout(pdfLoadTimeoutRef.current);
+      }
+    };
   }, [noteId]);
+
+  // Auto-switch to Google Docs Viewer after timeout (for direct URLs only)
+  useEffect(() => {
+    if (pdfLoading && pdfUrl && originalPdfUrl) {
+      const isGoogleViewer = pdfUrl.includes('docs.google.com');
+      
+      pdfLoadTimeoutRef.current = setTimeout(() => {
+        if (isGoogleViewer) {
+          // Already using Google Docs and still not loaded - show error with options
+          console.log('Google Docs Viewer timeout - showing error options');
+          setPdfLoading(false);
+          setPdfError(true);
+        } else {
+          // Direct URL failed - try Google Docs Viewer
+          console.log('Direct PDF load timeout - switching to Google Docs Viewer');
+          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
+        }
+      }, isGoogleViewer ? 12000 : 8000); // Give Google Docs more time
+    }
+    
+    return () => {
+      if (pdfLoadTimeoutRef.current) {
+        clearTimeout(pdfLoadTimeoutRef.current);
+      }
+    };
+  }, [pdfLoading, pdfUrl, originalPdfUrl]);
 
   useEffect(() => {
     // Scroll to bottom when new messages arrive
@@ -103,22 +139,36 @@ export default function PDFPreviewPage() {
         }
         setNote(fetchedNote);
         
-        // Set PDF URL - Use Google Docs Viewer for reliable inline display
+        // Set PDF URL - prioritize direct URLs for faster loading
         let rawPdfUrl = '';
+        let useGoogleViewer = false;
+        
         if (fetchedNote.cloudinaryUrl) {
+          // Cloudinary URLs work directly in iframes
           rawPdfUrl = fetchedNote.cloudinaryUrl;
         } else if (fetchedNote.fileUrl) {
+          // External file URLs work directly
           rawPdfUrl = fetchedNote.fileUrl;
         } else if (fetchedNote.fileId) {
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+          // GridFS files - use Google Docs Viewer for reliable cross-browser support
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
           rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
+          useGoogleViewer = true; // GridFS needs Google Viewer for reliability
         }
         
         if (rawPdfUrl) {
           // Store original URL for downloads
           setOriginalPdfUrl(rawPdfUrl);
-          // Use Google Docs Viewer for reliable PDF display
-          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
+          
+          if (useGoogleViewer) {
+            // Use Google Docs Viewer for GridFS files (more reliable)
+            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
+          } else {
+            // Use direct URL for Cloudinary/external URLs (faster)
+            setPdfUrl(rawPdfUrl);
+          }
+          setPdfLoading(true);
+          setPdfError(false);
         }
       }
     } catch (error) {
@@ -305,12 +355,73 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
             showChat ? 'lg:w-[65%]' : 'w-full'
           }`}
         >
-          {/* Google Docs Viewer iframe - works on all devices */}
+          {/* Loading/Error State */}
+          {pdfLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
+              <div className="text-center">
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+                <p className="text-white text-lg">Loading PDF...</p>
+                <p className="text-gray-400 text-sm mt-2">This may take a few seconds</p>
+              </div>
+            </div>
+          )}
+          
+          {pdfError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
+              <div className="text-center p-6 max-w-md">
+                <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                <p className="text-white text-lg mb-2">Unable to preview PDF</p>
+                <p className="text-gray-400 text-sm mb-4">Your browser may not support inline PDF viewing</p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => {
+                      // Try Google Docs Viewer as fallback
+                      if (originalPdfUrl) {
+                        setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
+                        setPdfError(false);
+                        setPdfLoading(true);
+                      }
+                    }}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2 justify-center"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                    Try Alternative Viewer
+                  </button>
+                  <a
+                    href={originalPdfUrl || ''}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2 justify-center"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open in New Tab
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Native browser PDF viewer (faster) with fallback */}
           <iframe
-            src={pdfUrl}
+            src={pdfUrl || ''}
             className="w-full h-full border-0"
             title={note.title}
             allow="autoplay"
+            onLoad={() => {
+              // Clear the timeout since PDF loaded
+              if (pdfLoadTimeoutRef.current) {
+                clearTimeout(pdfLoadTimeoutRef.current);
+              }
+              setPdfLoading(false);
+            }}
+            onError={() => {
+              // Clear timeout and show error
+              if (pdfLoadTimeoutRef.current) {
+                clearTimeout(pdfLoadTimeoutRef.current);
+              }
+              setPdfLoading(false);
+              setPdfError(true);
+            }}
           />
         </div>
 
