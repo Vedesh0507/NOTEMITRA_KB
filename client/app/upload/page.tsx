@@ -326,12 +326,12 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-6 sm:py-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Upload Notes</h1>
-          <p className="text-gray-600">Share your study materials with fellow students</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">Upload Notes</h1>
+          <p className="text-sm sm:text-base text-gray-600">Share your study materials with fellow students</p>
         </div>
 
         {/* Uploads Disabled Warning */}
@@ -372,7 +372,7 @@ export default function UploadPage() {
 
         {/* Upload Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* File Upload Area */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -381,35 +381,35 @@ export default function UploadPage() {
               
               {/* File Too Large Error Banner */}
               {fileTooLarge && oversizedFileInfo && (
-                <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
+                <div className="mb-4 bg-orange-50 border border-orange-200 rounded-lg p-3 sm:p-4">
+                  <div className="flex items-start gap-2 sm:gap-3">
                     <AlertCircle className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <h3 className="font-semibold text-orange-900">File Too Large</h3>
-                      <p className="text-orange-700 text-sm mt-1">
-                        <strong>{oversizedFileInfo.name}</strong> is {formatFileSize(oversizedFileInfo.size)}.
-                        Cloudinary free tier only supports PDFs up to <strong>10MB</strong>.
+                      <h3 className="font-semibold text-orange-900 text-sm sm:text-base">File Too Large</h3>
+                      <p className="text-orange-700 text-xs sm:text-sm mt-1">
+                        <strong className="break-all">{oversizedFileInfo.name}</strong> is {formatFileSize(oversizedFileInfo.size)}.
+                        Maximum size: <strong>10MB</strong>.
                       </p>
-                      <p className="text-orange-600 text-sm mt-2">
-                        Please compress your PDF using a free online tool, then try uploading again.
+                      <p className="text-orange-600 text-xs sm:text-sm mt-2">
+                        Please compress your PDF using a free online tool.
                       </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
+                      <div className="mt-3 flex flex-col sm:flex-row gap-2">
                         <a
                           href="https://www.ilovepdf.com/compress_pdf"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+                          className="inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-xs sm:text-sm font-medium"
                         >
                           <ExternalLink className="w-4 h-4" />
-                          Compress PDF (iLovePDF)
+                          Compress PDF
                         </a>
                         <button
                           type="button"
                           onClick={removeFile}
-                          className="inline-flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                          className="inline-flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-xs sm:text-sm font-medium"
                         >
                           <X className="w-4 h-4" />
-                          Clear Selection
+                          Clear
                         </button>
                       </div>
                     </div>
@@ -418,7 +418,7 @@ export default function UploadPage() {
               )}
               
               {!selectedFile && !fileTooLarge ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors">
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 sm:p-8 text-center hover:border-blue-400 transition-colors">
                   <input
                     type="file"
                     accept="application/pdf"
@@ -430,11 +430,11 @@ export default function UploadPage() {
                     htmlFor="file-upload"
                     className="cursor-pointer flex flex-col items-center"
                   >
-                    <Upload className="w-12 h-12 text-gray-400 mb-3" />
-                    <span className="text-gray-700 font-medium mb-1">
+                    <Upload className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mb-3" />
+                    <span className="text-gray-700 font-medium mb-1 text-sm sm:text-base">
                       Click to upload PDF
                     </span>
-                    <span className="text-gray-500 text-sm">
+                    <span className="text-gray-500 text-xs sm:text-sm">
                       Maximum file size: 10MB
                     </span>
                   </label>

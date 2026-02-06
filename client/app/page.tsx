@@ -23,26 +23,16 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
-      <section className="relative min-h-[600px] md:min-h-[700px] flex items-center justify-center py-24 px-4 overflow-hidden">
-        {/* Layer 1: Background Image - MUST BE VISIBLE */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat z-0"
-          style={{ backgroundImage: "url('/images/college.jpg')" }}
-          aria-hidden="true"
-        />
-        
-        {/* Layer 2: Gradient Overlay - Semi-transparent to show image */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-blue-900/40 to-indigo-900/50 z-[1]" aria-hidden="true" />
-        
-        {/* Layer 3: Content - On top of everything */}
+      <section className="relative min-h-[600px] md:min-h-[700px] flex items-center justify-center py-24 px-4 overflow-hidden bg-gradient-to-b from-blue-50 via-indigo-50 to-white">
+        {/* Content */}
         <div className="relative z-10 max-w-7xl mx-auto w-full">
           <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-5xl md:text-6xl font-extrabold text-white mb-6 leading-tight drop-shadow-lg">
+            <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 mb-6 leading-tight">
               Your Academic Success<br />
-              <span className="text-blue-400">Starts Here</span>
+              <span className="text-blue-600">Starts Here</span>
             </h1>
-            <p className="text-xl text-gray-100 mb-10 leading-relaxed max-w-3xl mx-auto drop-shadow-md">
-              <strong className="text-white">NoteMitra</strong> is your trusted platform for sharing and discovering high-quality academic notes. 
+            <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
+              <strong className="text-gray-900">NoteMitra</strong> is your trusted platform for sharing and discovering high-quality academic notes. 
               Connect with fellow students, access verified study materials, and build your academic reputation. 
               Whether you're looking to share your knowledge or find the perfect study resources, NoteMitra makes 
               learning collaborative, efficient, and rewarding.
@@ -56,7 +46,7 @@ export default function HomePage() {
               <Button 
                 size="lg" 
                 variant="outline" 
-                className="w-full sm:w-auto text-lg px-8 py-6 bg-white/10 backdrop-blur-sm border-2 border-white text-white hover:bg-white hover:text-blue-600 shadow-lg"
+                className="w-full sm:w-auto text-lg px-8 py-6 border-2 border-gray-300 text-gray-700 hover:bg-gray-50 shadow-sm"
                 onClick={handleExploreClick}
               >
                 <Search className="mr-2 h-5 w-5" />

@@ -477,102 +477,104 @@ export default function NoteDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-4 sm:py-8">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
           onClick={() => router.back()}
-          className="text-blue-600 hover:text-blue-700 mb-6 flex items-center gap-2"
+          className="text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 flex items-center gap-2 text-sm sm:text-base"
         >
           ← Back to Browse
         </button>
 
         {/* Note Header */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4 sm:mb-6">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-3">{note.title}</h1>
-              <p className="text-gray-600 mb-4">{note.description}</p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 sm:mb-3">{note.title}</h1>
+              <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">{note.description}</p>
 
               {/* Metadata Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+                <span className="bg-blue-100 text-blue-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
                   {note.subject}
                 </span>
-                <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-purple-100 text-purple-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
                   Semester {note.semester}
                 </span>
-                <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                <span className="bg-green-100 text-green-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
                   {note.branch}
                 </span>
                 {note.module && (
-                  <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                  <span className="bg-orange-100 text-orange-800 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium">
                     {note.module}
                   </span>
                 )}
               </div>
 
               {/* Author and Date */}
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4" />
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{note.userName}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>{new Date(note.createdAt).toLocaleDateString()}</span>
                 </div>
               </div>
             </div>
 
             {/* Download and Preview Buttons */}
-            <div className="flex flex-col gap-2">
-              <Button onClick={handlePreview} variant="outline" className="flex items-center gap-2">
+            <div className="flex flex-row md:flex-col gap-2 flex-wrap">
+              <Button onClick={handlePreview} variant="outline" className="flex items-center gap-2 text-sm">
                 <Eye className="w-4 h-4" />
-                Preview PDF
+                <span className="hidden sm:inline">Preview PDF</span>
+                <span className="sm:hidden">Preview</span>
               </Button>
-              <Button onClick={handleDownload} className="flex items-center gap-2">
+              <Button onClick={handleDownload} className="flex items-center gap-2 text-sm">
                 <Download className="w-4 h-4" />
-                Download PDF
+                <span className="hidden sm:inline">Download PDF</span>
+                <span className="sm:hidden">Download</span>
               </Button>
               <Button 
                 onClick={handleSaveToggle} 
                 disabled={savingNote}
                 variant={isSaved ? "default" : "outline"}
-                className="flex items-center gap-2"
+                className="flex items-center gap-2 text-sm"
               >
                 <BookmarkPlus className="w-4 h-4" />
                 {savingNote ? 'Saving...' : isSaved ? 'Saved' : 'Save'}
               </Button>
-              <div className="text-sm text-gray-600 text-center">
+              <div className="text-xs sm:text-sm text-gray-600 text-center w-full md:w-auto">
                 {note.fileSize ? `${(note.fileSize / (1024 * 1024)).toFixed(2)} MB` : 'Size unknown'}
               </div>
             </div>
           </div>
 
           {/* Stats and Actions Row */}
-          <div className="flex flex-wrap items-center justify-between pt-6 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-4 pt-4 sm:pt-6 border-t border-gray-200">
             {/* Stats */}
-            <div className="flex items-center gap-6 text-gray-600">
-              <div className="flex items-center gap-2">
-                <Eye className="w-5 h-5" />
+            <div className="flex items-center gap-4 sm:gap-6 text-gray-600 text-sm sm:text-base">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="font-medium">{note.views}</span>
-                <span className="text-sm">views</span>
+                <span className="text-xs sm:text-sm">views</span>
               </div>
-              <div className="flex items-center gap-2">
-                <Download className="w-5 h-5" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="font-medium">{note.downloads}</span>
-                <span className="text-sm">downloads</span>
+                <span className="text-xs sm:text-sm">downloads</span>
               </div>
-              <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5" />
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span className="font-medium">{comments.length}</span>
-                <span className="text-sm">comments</span>
+                <span className="text-xs sm:text-sm hidden sm:inline">comments</span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
               {/* Voting */}
               <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
@@ -619,27 +621,27 @@ export default function NoteDetailPage() {
         </div>
 
         {/* Comments Section */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">
             Comments ({comments.length})
           </h2>
 
           {/* Add Comment Form */}
           {user ? (
-            <form onSubmit={handleSubmitComment} className="mb-6">
-              <div className="flex gap-3">
+            <form onSubmit={handleSubmitComment} className="mb-4 sm:mb-6">
+              <div className="flex gap-2 sm:gap-3">
                 <div className="flex-1">
                   <textarea
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     placeholder="Add a comment..."
                     rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
                   />
                 </div>
               </div>
               <div className="flex justify-end mt-2">
-                <Button type="submit" disabled={submittingComment || !commentText.trim()}>
+                <Button type="submit" disabled={submittingComment || !commentText.trim()} className="text-sm sm:text-base">
                   {submittingComment ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -655,40 +657,40 @@ export default function NoteDetailPage() {
               </div>
             </form>
           ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-center">
-              <p className="text-gray-600 mb-3">Sign in to leave a comment</p>
-              <Button onClick={() => router.push('/auth/signin')}>Sign In</Button>
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4 mb-4 sm:mb-6 text-center">
+              <p className="text-gray-600 mb-2 sm:mb-3 text-sm sm:text-base">Sign in to leave a comment</p>
+              <Button onClick={() => router.push('/auth/signin')} className="text-sm sm:text-base">Sign In</Button>
             </div>
           )}
 
           {/* Comments List */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {comments.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">
+              <p className="text-gray-500 text-center py-6 sm:py-8 text-sm sm:text-base">
                 No comments yet. Be the first to comment!
               </p>
             ) : (
               comments.map((comment) => (
                 <div
                   key={comment._id}
-                  className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition"
+                  className="border border-gray-200 rounded-lg p-3 sm:p-4 hover:bg-gray-50 transition"
                 >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-gray-600" />
-                      <span className="font-medium text-gray-900">{comment.userName}</span>
-                      <span className="text-gray-500 text-sm">
+                  <div className="flex items-start justify-between mb-2 gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-600" />
+                      <span className="font-medium text-gray-900 text-sm sm:text-base">{comment.userName}</span>
+                      <span className="text-gray-500 text-xs sm:text-sm">
                         {new Date(comment.createdAt).toLocaleDateString()}
                       </span>
                     </div>
                     
                     {user && user.id === comment.userId && (
-                      <div className="flex items-center gap-2">
-                        <button className="text-gray-400 hover:text-blue-600">
-                          <Edit className="w-4 h-4" />
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                        <button className="text-gray-400 hover:text-blue-600 p-1">
+                          <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                         <button 
-                          className="text-gray-400 hover:text-red-600"
+                          className="text-gray-400 hover:text-red-600 p-1"
                           onClick={async () => {
                             try {
                               await notesAPI.deleteComment(comment._id);
@@ -699,12 +701,12 @@ export default function NoteDetailPage() {
                             }
                           }}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </button>
                       </div>
                     )}
                   </div>
-                  <p className="text-gray-700">{comment.text}</p>
+                  <p className="text-gray-700 text-sm sm:text-base">{comment.text}</p>
                 </div>
               ))
             )}

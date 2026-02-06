@@ -187,104 +187,119 @@ export default function ProfilePage() {
   const savedNotesCount = (user as any).savedNotesCount || savedNotes.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-6 sm:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Profile Header */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+        <div className="bg-white rounded-lg shadow-md overflow-hidden mb-4 sm:mb-6">
           {/* Cover Image */}
-          <div className="h-32 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
+          <div className="h-24 sm:h-32 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"></div>
 
           {/* Profile Info */}
-          <div className="px-6 pb-6">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between -mt-16 mb-4">
-              {/* Avatar */}
-              <div className="flex items-end gap-4 mb-4 md:mb-0">
-                <div className="w-32 h-32 rounded-full bg-white border-4 border-white shadow-lg flex items-center justify-center">
-                  <User className="w-16 h-16 text-gray-400" />
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between -mt-12 sm:-mt-16 mb-4">
+              {/* Avatar and Name */}
+              <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4 mb-4 sm:mb-0">
+                <div className="w-20 h-20 sm:w-32 sm:h-32 rounded-full bg-white border-4 border-white shadow-lg flex items-center justify-center mx-auto sm:mx-0">
+                  <User className="w-10 h-10 sm:w-16 sm:h-16 text-gray-400" />
                 </div>
-                <div className="pb-2">
-                  <h1 className="text-3xl font-bold text-gray-900">{user.name}</h1>
-                  <p className="text-gray-600 flex items-center gap-2 mt-1">
+                <div className="text-center sm:text-left sm:pb-2">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">{user.name}</h1>
+                  <p className="text-gray-600 flex items-center justify-center sm:justify-start gap-2 mt-1 text-sm sm:text-base">
                     <Mail className="w-4 h-4" />
-                    {user.email}
+                    <span className="truncate max-w-[200px] sm:max-w-none">{user.email}</span>
                   </p>
                 </div>
               </div>
 
               {/* Edit Profile Button */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-center sm:justify-end">
                 <Button variant="outline" size="sm" onClick={() => setShowEditModal(true)}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Profile
+                  <Edit className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Edit Profile</span>
                 </Button>
                 <Button variant="outline" size="sm" onClick={logout}>
-                  Logout
+                  <span className="sm:hidden">Logout</span>
+                  <span className="hidden sm:inline">Logout</span>
                 </Button>
               </div>
             </div>
 
             {/* User Details */}
-            <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-6">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600 mb-4 sm:mb-6">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <GraduationCap className="w-4 h-4" />
                 <span className="capitalize">{user.role || 'Student'}</span>
               </div>
               {user.branch && (
-                <div className="flex items-center gap-2">
-                  <span>Branch: {user.branch}</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <span>{user.branch}</span>
                 </div>
               )}
               {user.section && (
-                <div className="flex items-center gap-2">
-                  <span>Section: {user.section}</span>
+                <div className="flex items-center gap-1 sm:gap-2">
+                  <span>Sec: {user.section}</span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>Joined {new Date().toLocaleDateString()}</span>
-              </div>
             </div>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <FileText className="w-6 h-6 text-blue-600" />
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 sm:p-4 text-center">
+                <div className="flex justify-center mb-1 sm:mb-2">
+                  <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
-                <div className="text-2xl font-bold text-blue-900">{notesUploaded}</div>
-                <div className="text-sm text-blue-700">Notes Uploaded</div>
+                <div className="text-lg sm:text-2xl font-bold text-blue-900">{notesUploaded}</div>
+                <div className="text-[10px] sm:text-sm text-blue-700">Uploaded</div>
               </div>
 
-              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <Download className="w-6 h-6 text-green-600" />
+              <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 sm:p-4 text-center">
+                <div className="flex justify-center mb-1 sm:mb-2">
+                  <Download className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                 </div>
-                <div className="text-2xl font-bold text-green-900">{totalDownloads}</div>
-                <div className="text-sm text-green-700">Downloads</div>
+                <div className="text-lg sm:text-2xl font-bold text-green-900">{totalDownloads}</div>
+                <div className="text-[10px] sm:text-sm text-green-700">Downloads</div>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <Eye className="w-6 h-6 text-purple-600" />
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2 sm:p-4 text-center">
+                <div className="flex justify-center mb-1 sm:mb-2">
+                  <Eye className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                 </div>
-                <div className="text-2xl font-bold text-purple-900">{totalViews}</div>
-                <div className="text-sm text-purple-700">Total Views</div>
+                <div className="text-lg sm:text-2xl font-bold text-purple-900">{totalViews}</div>
+                <div className="text-[10px] sm:text-sm text-purple-700">Views</div>
               </div>
 
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <ThumbsUp className="w-6 h-6 text-orange-600" />
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 sm:p-4 text-center hidden sm:block">
+                <div className="flex justify-center mb-1 sm:mb-2">
+                  <ThumbsUp className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                 </div>
-                <div className="text-2xl font-bold text-orange-900">{totalUpvotes}</div>
-                <div className="text-sm text-orange-700">Upvotes</div>
+                <div className="text-lg sm:text-2xl font-bold text-orange-900">{totalUpvotes}</div>
+                <div className="text-[10px] sm:text-sm text-orange-700">Upvotes</div>
               </div>
 
-              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-4 text-center">
-                <div className="flex justify-center mb-2">
-                  <Award className="w-6 h-6 text-pink-600" />
+              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 sm:p-4 text-center hidden sm:block">
+                <div className="flex justify-center mb-1 sm:mb-2">
+                  <Award className="w-5 h-5 sm:w-6 sm:h-6 text-pink-600" />
                 </div>
-                <div className="text-2xl font-bold text-pink-900">{reputation}</div>
-                <div className="text-sm text-pink-700">Reputation</div>
+                <div className="text-lg sm:text-2xl font-bold text-pink-900">{reputation}</div>
+                <div className="text-[10px] sm:text-sm text-pink-700">Reputation</div>
+              </div>
+            </div>
+
+            {/* Mobile-only row for Upvotes and Reputation */}
+            <div className="grid grid-cols-2 gap-2 mt-2 sm:hidden">
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 text-center">
+                <div className="flex justify-center mb-1">
+                  <ThumbsUp className="w-5 h-5 text-orange-600" />
+                </div>
+                <div className="text-lg font-bold text-orange-900">{totalUpvotes}</div>
+                <div className="text-[10px] text-orange-700">Upvotes</div>
+              </div>
+              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 text-center">
+                <div className="flex justify-center mb-1">
+                  <Award className="w-5 h-5 text-pink-600" />
+                </div>
+                <div className="text-lg font-bold text-pink-900">{reputation}</div>
+                <div className="text-[10px] text-pink-700">Reputation</div>
               </div>
             </div>
           </div>

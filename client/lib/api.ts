@@ -5,10 +5,10 @@ const getApiUrl = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === '192.168.1.35' || hostname === '192.168.245.192') {
-      return `http://${hostname}:5000/api`;
+      return `http://${hostname}:5001/api`;
     }
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 };
 
 const API_URL = getApiUrl();

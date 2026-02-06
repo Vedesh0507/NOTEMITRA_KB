@@ -105,9 +105,14 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Menu */}
-      {mobileMenuOpen && (
-        <div id="mobile-menu" className="md:hidden bg-white border-t border-gray-200" role="menu">
-          <div className="px-4 py-4 space-y-3">
+      <div 
+        id="mobile-menu" 
+        className={`md:hidden bg-white border-t border-gray-200 overflow-hidden transition-all duration-300 ease-in-out ${
+          mobileMenuOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
+        }`}
+        role="menu"
+      >
+        <div className="px-4 py-4 space-y-3">
             {isReady && user && (
               <>
                 <Link
@@ -196,7 +201,6 @@ export default function Navbar() {
             </div>
           </div>
         </div>
-      )}
     </nav>
   );
 }
