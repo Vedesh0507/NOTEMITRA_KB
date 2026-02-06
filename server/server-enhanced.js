@@ -176,6 +176,41 @@ if (process.env.NODE_ENV === 'test') {
     profilePic: '',
     createdAt: new Date('2025-03-01')
   });
+  
+  // Suspended user for account locked test
+  users.push({
+    id: 'suspendeduser',
+    _id: 'suspendeduser',
+    name: 'Suspended User',
+    email: 'suspended@example.com',
+    password: 'hashedpassword',
+    role: 'student',
+    branch: 'Computer Science',
+    section: 'A',
+    notesUploaded: 0,
+    totalDownloads: 0,
+    totalViews: 0,
+    profilePic: '',
+    isSuspended: true,
+    createdAt: new Date('2025-01-15')
+  });
+  
+  // User with special characters in password for testing
+  users.push({
+    id: 'specialuser',
+    _id: 'specialuser',
+    name: 'Special Char User',
+    email: 'special@example.com',
+    password: 'P@$$w0rd!#%&*',
+    role: 'student',
+    branch: 'Computer Science',
+    section: 'A',
+    notesUploaded: 0,
+    totalDownloads: 0,
+    totalViews: 0,
+    profilePic: '',
+    createdAt: new Date('2025-02-15')
+  });
 }
 
 // GridFS variables
