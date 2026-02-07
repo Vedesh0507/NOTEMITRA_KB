@@ -49,13 +49,15 @@ export default function HomePage() {
         {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto w-full">
           <div className="text-center max-w-3xl mx-auto px-2">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100/80 backdrop-blur-sm rounded-full mb-4 md:mb-6">
-              <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-xs md:text-sm font-medium text-blue-700">
-                {userCount !== null ? `Trusted by ${userCount} Students` : 'Loading...'}
-              </span>
-            </div>
+            {/* Badge - Only show when user count is loaded */}
+            {userCount !== null && userCount > 0 && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100/80 backdrop-blur-sm rounded-full mb-4 md:mb-6">
+                <Sparkles className="w-4 h-4 text-blue-600" />
+                <span className="text-xs md:text-sm font-medium text-blue-700">
+                  Trusted by {userCount} Student{userCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
             
             {/* Main Headline - Mobile optimized */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 mb-4 md:mb-6 leading-tight tracking-tight">
