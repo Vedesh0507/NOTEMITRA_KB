@@ -112,6 +112,8 @@ tmp/
 uploads/
 public/uploads/
 server/uploads/
+pdfs/
+*.pdf
 
 # ============================================
 # Database Files (for local development)
