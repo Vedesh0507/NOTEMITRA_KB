@@ -627,6 +627,32 @@ app.get('/api/health', (req, res) => {
   }
 });
 
+// Public stats endpoint - shows user count for homepage
+app.get('/api/public/stats', async (req, res) => {
+  try {
+    res.set('Cache-Control', 'public, max-age=60'); // Cache for 1 minute
+    
+    let totalUsers = 0;
+    let totalNotes = 0;
+    
+    if (useMongoDB) {
+      totalUsers = await User.countDocuments();
+      totalNotes = await Note.countDocuments();
+    } else {
+      totalUsers = users.length;
+      totalNotes = notes.length;
+    }
+    
+    res.json({
+      totalUsers,
+      totalNotes
+    });
+  } catch (error) {
+    console.error('Public stats error:', error);
+    res.status(500).json({ totalUsers: 0, totalNotes: 0 });
+  }
+});
+
 // Auth routes
 app.post('/api/auth/signup', async (req, res) => {
   try {

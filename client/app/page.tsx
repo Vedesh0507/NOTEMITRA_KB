@@ -5,13 +5,31 @@ import { Button } from '@/components/ui/button';
 import { BookOpen, Upload, Users, Sparkles, TrendingUp, Shield, Search, Download, MessageSquare, Mail, Phone, User } from 'lucide-react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import HeroBackground from '@/components/HeroBackground';
 
 export default function HomePage() {
   const { user } = useAuth();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [userCount, setUserCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    // Fetch real user count from backend
+    const fetchStats = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const res = await fetch(`${apiUrl}/api/public/stats`);
+        if (res.ok) {
+          const data = await res.json();
+          setUserCount(data.totalUsers);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    };
+    fetchStats();
+  }, []);
 
   const handleExploreClick = (e: React.MouseEvent) => {
     if (!user) {
@@ -34,7 +52,9 @@ export default function HomePage() {
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-100/80 backdrop-blur-sm rounded-full mb-4 md:mb-6">
               <Sparkles className="w-4 h-4 text-blue-600" />
-              <span className="text-xs md:text-sm font-medium text-blue-700">Trusted by 1000+ Students</span>
+              <span className="text-xs md:text-sm font-medium text-blue-700">
+                {userCount !== null ? `Trusted by ${userCount} Students` : 'Loading...'}
+              </span>
             </div>
             
             {/* Main Headline - Mobile optimized */}
