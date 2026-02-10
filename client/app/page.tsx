@@ -9,10 +9,17 @@ import { useState, useEffect } from 'react';
 import HeroBackground from '@/components/HeroBackground';
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [userCount, setUserCount] = useState<number | null>(null);
+
+  // Redirect logged-in users to browse page
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/browse');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     // Fetch real user count from backend
@@ -39,6 +46,22 @@ export default function HomePage() {
       router.push('/browse');
     }
   };
+
+  // Show loading while checking auth (prevents flash of home page for logged-in users)
+  if (loading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50/50 via-white to-purple-50/50">
+        <div className="text-center">
+          <div className="relative mb-4">
+            <div className="w-12 h-12 rounded-full border-4 border-blue-100 mx-auto"></div>
+            <div className="absolute inset-0 w-12 h-12 rounded-full border-4 border-transparent border-t-blue-600 mx-auto animate-spin"></div>
+          </div>
+          <p className="text-gray-500 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen">
       {/* Hero Section */}
