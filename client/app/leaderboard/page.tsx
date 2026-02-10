@@ -142,7 +142,7 @@ export default function LeaderboardPage() {
                         {getRankEmoji(index)} {user.name}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        Joined {new Date(user.joinDate).toLocaleDateString()}
+                        First upload: {new Date(user.joinDate).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
@@ -177,7 +177,7 @@ export default function LeaderboardPage() {
                       </h3>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      Joined {new Date(user.joinDate).toLocaleDateString()}
+                      First upload: {new Date(user.joinDate).toLocaleDateString()}
                     </p>
                   </div>
 

@@ -323,6 +323,14 @@ export default function NoteDetailPage() {
           }, 5000);
           
           console.log('✅ Download initiated with proper filename');
+          // Track download in database
+          try {
+            const downloadNoteId = note._id || note.id || noteId;
+            await notesAPI.trackDownload(String(downloadNoteId));
+            console.log('✅ Download tracked in database');
+          } catch (trackError) {
+            console.error('Failed to track download:', trackError);
+          }
           // Update local download count
           setNote({ ...note, downloads: note.downloads + 1 });
         } else {
@@ -422,6 +430,14 @@ export default function NoteDetailPage() {
         }
         
         console.log('✅ Download initiated successfully');
+        // Track download in database
+        try {
+          const downloadNoteId = note._id || note.id || noteId;
+          await notesAPI.trackDownload(String(downloadNoteId));
+          console.log('✅ Download tracked in database');
+        } catch (trackError) {
+          console.error('Failed to track download:', trackError);
+        }
         // Update local download count
         setNote({ ...note, downloads: note.downloads + 1 });
       }

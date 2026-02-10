@@ -43,35 +43,13 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor - DO NOT auto-redirect on 401
+// Let the AuthContext handle auth state to avoid logout loops
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        if (typeof window === 'undefined') {
-          throw new Error('Not in browser context');
-        }
-
-        // For now, just redirect to login if unauthorized
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth/signin';
-        return Promise.reject(error);
-      } catch (refreshError) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/auth/signin';
-        }
-        return Promise.reject(refreshError);
-      }
-    }
-
+    // Just pass through the error, let components handle it
+    // This prevents aggressive token clearing that causes login loops
     return Promise.reject(error);
   }
 );

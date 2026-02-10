@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { 
   ArrowLeft, 
   MessageSquare, 
@@ -10,15 +9,13 @@ import {
   Send, 
   Loader2,
   Download,
-  ZoomIn,
-  ZoomOut,
   RotateCw,
-  Maximize2,
-  Menu,
+  FileText,
+  ExternalLink,
   Bot,
   Sparkles,
-  FileText,
-  ExternalLink
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
 
@@ -44,7 +41,6 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-// Use environment variable for Groq API key (set in Vercel dashboard)
 const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
 
 export default function PDFPreviewPage() {
@@ -52,20 +48,15 @@ export default function PDFPreviewPage() {
   const router = useRouter();
   const noteId = params?.id as string;
   
-  // Detect mobile immediately (client-side only)
-  const [isMobile] = useState(() => 
-    typeof window !== 'undefined' 
-      ? /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-      : false
-  );
-  
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(true);
   const [pdfError, setPdfError] = useState(false);
-  const [viewerType, setViewerType] = useState<'native' | 'google' | 'pdfjs'>('native');
+  const [viewerUrl, setViewerUrl] = useState<string | null>(null);
+  const [viewerType, setViewerType] = useState<'google' | 'office' | 'pdfjs'>('google');
+  const [retryCount, setRetryCount] = useState(0);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // AI Chat state
   const [showChat, setShowChat] = useState(false);
@@ -74,72 +65,82 @@ export default function PDFPreviewPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [queriesLeft, setQueriesLeft] = useState(30);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pdfLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const loadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Build viewer URL - Google Docs Viewer renders PDF without downloading
+  const buildViewerUrl = useCallback((rawUrl: string, type: 'google' | 'office' | 'pdfjs') => {
+    const encodedUrl = encodeURIComponent(rawUrl);
+    switch (type) {
+      case 'google':
+        // Google Docs Viewer - most reliable, works on all devices
+        return `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
+      case 'office':
+        // Office Online Viewer - good alternative
+        return `https://view.officeapps.live.com/op/embed.aspx?src=${encodedUrl}`;
+      case 'pdfjs':
+        // Mozilla PDF.js - smooth zoom/scroll but slower to load
+        return `https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodedUrl}`;
+      default:
+        return `https://docs.google.com/gview?url=${encodedUrl}&embedded=true`;
+    }
+  }, []);
+
+  // Fetch note details on mount
   useEffect(() => {
     if (noteId) {
-      // Start fetching immediately
       fetchNoteDetails();
     }
     
-    // Cleanup timeout on unmount
     return () => {
-      if (pdfLoadTimeoutRef.current) {
-        clearTimeout(pdfLoadTimeoutRef.current);
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
       }
     };
   }, [noteId]);
 
-  // Show error if PDF takes too long to load
+  // Build viewer URL when originalPdfUrl or viewerType changes
   useEffect(() => {
-    if (pdfLoading && pdfUrl) {
-      pdfLoadTimeoutRef.current = setTimeout(() => {
-        console.log('PDF preview timeout - trying next viewer');
-        // Auto-try next viewer type
-        if (viewerType === 'native' && originalPdfUrl) {
-          setViewerType('google');
-          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
-        } else if (viewerType === 'google' && originalPdfUrl) {
-          setViewerType('pdfjs');
-          setPdfUrl(`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(originalPdfUrl)}`);
-        } else {
-          setPdfLoading(false);
-          setPdfError(true);
-        }
-      }, 15000); // 15 second timeout, then try next viewer
-    }
-    
-    return () => {
-      if (pdfLoadTimeoutRef.current) {
-        clearTimeout(pdfLoadTimeoutRef.current);
+    if (originalPdfUrl) {
+      const url = buildViewerUrl(originalPdfUrl, viewerType);
+      setViewerUrl(url);
+      setPdfLoading(true);
+      setPdfError(false);
+      
+      // Set timeout for loading - auto-switch viewer if too slow
+      if (loadTimeoutRef.current) {
+        clearTimeout(loadTimeoutRef.current);
       }
-    };
-  }, [pdfLoading, pdfUrl, viewerType, originalPdfUrl]);
+      loadTimeoutRef.current = setTimeout(() => {
+        if (pdfLoading && retryCount < 2) {
+          console.log('Viewer timeout, switching to next viewer');
+          handleSwitchViewer();
+        }
+      }, 20000); // 20 second timeout
+    }
+  }, [originalPdfUrl, viewerType, buildViewerUrl]);
 
+  // Auto-scroll chat
   useEffect(() => {
-    // Scroll to bottom when new messages arrive
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Add welcome message when chat opens
+  // Welcome message
   useEffect(() => {
     if (showChat && messages.length === 0 && note) {
-      const welcomeMessage: ChatMessage = {
+      setMessages([{
         id: 'welcome',
         role: 'assistant',
-        content: `👋 Hi! I'm your AI study assistant. I'm here to help you understand "${note.title}".\n\nAsk me anything about:\n• Concepts explained in this PDF\n• Clarification on specific topics\n• Related examples or explanations\n• General questions about ${note.subject}\n\nJust type your question below!`,
+        content: `👋 Hi! I'm here to help you understand "${note.title}".\n\nAsk me about:\n• Key concepts in this document\n• Clarifications on specific topics\n• Examples and explanations\n\nType your question below!`,
         timestamp: new Date()
-      };
-      setMessages([welcomeMessage]);
+      }]);
     }
-  }, [showChat, note]);
+  }, [showChat, note, messages.length]);
 
   const fetchNoteDetails = async () => {
     try {
-      // Don't block - show UI immediately
       const response = await notesAPI.getNoteById(noteId);
       const fetchedNote = response.data.note;
       
@@ -148,9 +149,8 @@ export default function PDFPreviewPage() {
           fetchedNote.id = fetchedNote._id;
         }
         
-        // Set PDF URL immediately for fastest loading
+        // Get the raw PDF URL
         let rawPdfUrl = '';
-        
         if (fetchedNote.cloudinaryUrl) {
           rawPdfUrl = fetchedNote.cloudinaryUrl;
         } else if (fetchedNote.fileUrl) {
@@ -160,24 +160,9 @@ export default function PDFPreviewPage() {
           rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
         }
         
-        // Batch state updates for better performance
         if (rawPdfUrl) {
-          // Store original URL for downloads
           setOriginalPdfUrl(rawPdfUrl);
-          
-          // Start with native viewer for Cloudinary URLs (fastest)
-          // Use native for all initially - most browsers support it now
-          if (fetchedNote.cloudinaryUrl || !isMobile) {
-            setViewerType('native');
-            setPdfUrl(rawPdfUrl);
-          } else {
-            // Mobile without Cloudinary - use Google Docs
-            setViewerType('google');
-            setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(rawPdfUrl)}&embedded=true`);
-          }
         }
-        
-        // Set note after URL to avoid extra re-renders
         setNote(fetchedNote);
       }
     } catch (error) {
@@ -185,6 +170,141 @@ export default function PDFPreviewPage() {
       setPdfError(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleIframeLoad = () => {
+    // Clear the timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    setPdfLoading(false);
+    setRetryCount(0);
+  };
+
+  const handleIframeError = () => {
+    // Clear the timeout
+    if (loadTimeoutRef.current) {
+      clearTimeout(loadTimeoutRef.current);
+    }
+    
+    // Try next viewer type
+    if (retryCount < 2 && originalPdfUrl) {
+      setRetryCount(prev => prev + 1);
+      handleSwitchViewer();
+    } else {
+      setPdfLoading(false);
+      setPdfError(true);
+    }
+  };
+
+  const handleRetry = () => {
+    if (originalPdfUrl) {
+      setPdfLoading(true);
+      setPdfError(false);
+      setRetryCount(0);
+      // Force refresh by appending timestamp
+      const url = buildViewerUrl(originalPdfUrl + (originalPdfUrl.includes('?') ? '&' : '?') + '_t=' + Date.now(), viewerType);
+      setViewerUrl(url);
+    }
+  };
+
+  const handleSwitchViewer = () => {
+    if (originalPdfUrl) {
+      const viewers: Array<'google' | 'office' | 'pdfjs'> = ['google', 'office', 'pdfjs'];
+      const currentIndex = viewers.indexOf(viewerType);
+      const nextType = viewers[(currentIndex + 1) % viewers.length];
+      setViewerType(nextType);
+      setRetryCount(prev => prev + 1);
+    }
+  };
+
+  // Download PDF properly - ensures PDF format on all devices
+  const handleDownload = async () => {
+    if (!originalPdfUrl || !note || isDownloading) return;
+    
+    setIsDownloading(true);
+    
+    try {
+      // Prepare filename with .pdf extension
+      let filename = note.fileName || `${note.title}.pdf` || 'document.pdf';
+      if (!filename.toLowerCase().endsWith('.pdf')) {
+        filename = filename + '.pdf';
+      }
+      // Sanitize filename
+      filename = filename.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
+      
+      console.log('📥 Starting download:', filename);
+      
+      // Fetch the PDF as blob
+      const response = await fetch(originalPdfUrl, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit',
+        headers: {
+          'Accept': 'application/pdf,application/octet-stream,*/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+      // Get the blob data
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Create a proper PDF blob with explicit MIME type
+      const pdfBlob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      
+      // Create object URL
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      link.type = 'application/pdf';
+      link.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+      
+      // Add to DOM
+      document.body.appendChild(link);
+      
+      // Trigger download - use click() for all devices
+      link.click();
+      
+      // Cleanup after delay
+      setTimeout(() => {
+        if (link.parentNode) {
+          document.body.removeChild(link);
+        }
+        URL.revokeObjectURL(blobUrl);
+      }, 15000);
+      
+      console.log('✅ Download triggered successfully');
+      
+      // Track download in database
+      try {
+        const downloadNoteId = note._id || note.id || noteId;
+        await notesAPI.trackDownload(String(downloadNoteId));
+        console.log('✅ Download tracked');
+      } catch (trackError) {
+        console.log('Track download failed:', trackError);
+      }
+      
+    } catch (error) {
+      console.error('Download error:', error);
+      
+      // Fallback: Try opening in new tab
+      try {
+        const newWindow = window.open(originalPdfUrl, '_blank');
+        if (!newWindow) {
+          alert('Download blocked. Please allow popups and try again, or use "Open in New Tab".');
+        }
+      } catch {
+        alert('Download failed. Please try "Open in New Tab" option.');
+      }
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -204,14 +324,9 @@ export default function PDFPreviewPage() {
     setQueriesLeft(prev => prev - 1);
 
     try {
-      // Build context for Groq
-      const systemPrompt = note ? `You are a helpful AI study assistant. The user is viewing a PDF document titled "${note.title}" about ${note.subject}.
-Subject: ${note.subject}
-Semester: ${note.semester}
-${note.module ? `Module: ${note.module}` : ''}
-${note.description ? `Description: ${note.description}` : ''}
-
-Help the user understand the content. Explain topics clearly as a helpful tutor would. Keep answers concise but informative. If you don't know something specific about the document content, provide general educational information about the topic.` : 'You are a helpful AI study assistant.';
+      const systemPrompt = note 
+        ? `You are a helpful study assistant. The user is studying "${note.title}" (${note.subject}, Semester ${note.semester}). Help explain concepts clearly and concisely.`
+        : 'You are a helpful study assistant.';
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -220,130 +335,52 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           'Authorization': `Bearer ${GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
+          model: 'llama-3.1-70b-versatile',
           messages: [
             { role: 'system', content: systemPrompt },
+            ...messages.filter(m => m.id !== 'welcome').map(m => ({
+              role: m.role,
+              content: m.content
+            })),
             { role: 'user', content: userMessage.content }
           ],
-          temperature: 0.7,
           max_tokens: 1024,
-        })
+          temperature: 0.7,
+        }),
       });
 
-      const data = await response.json();
-      
-      let assistantContent = "I'm sorry, I couldn't generate a response. Please try again.";
-      
-      if (data.choices && data.choices[0]?.message?.content) {
-        assistantContent = data.choices[0].message.content;
-      } else if (data.error) {
-        assistantContent = `Error: ${data.error.message || 'API request failed'}`;
+      if (response.ok) {
+        const data = await response.json();
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.choices[0]?.message?.content || 'Sorry, I could not generate a response.',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, assistantMessage]);
+      } else {
+        throw new Error('API request failed');
       }
-
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: assistantContent,
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Chat error:', error);
-      const errorMessage: ChatMessage = {
+      setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please try again.',
         timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      }]);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!originalPdfUrl || !note) return;
-    
-    try {
-      // Determine proper filename with .pdf extension
-      let filename = note.fileName || `${note.title}.pdf` || 'download.pdf';
-      if (!filename.toLowerCase().endsWith('.pdf')) {
-        filename = filename + '.pdf';
-      }
-      // Sanitize filename - remove invalid characters
-      filename = filename.replace(/[<>:"/\\|?*]/g, '_');
-      
-      console.log('📥 Downloading PDF with filename:', filename);
-      
-      // Fetch the PDF as blob
-      const response = await fetch(originalPdfUrl, {
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch PDF: ${response.status}`);
-      }
-      
-      const blob = await response.blob();
-      const pdfBlob = new Blob([blob], { type: 'application/pdf' });
-      const blobUrl = window.URL.createObjectURL(pdfBlob);
-      
-      // Create download link with proper attributes
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      link.type = 'application/pdf';
-      link.style.display = 'none';
-      document.body.appendChild(link);
-      
-      // For mobile, trigger click differently
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      if (isMobile) {
-        const clickEvent = new MouseEvent('click', {
-          view: window,
-          bubbles: true,
-          cancelable: true
-        });
-        link.dispatchEvent(clickEvent);
-      } else {
-        link.click();
-      }
-      
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(blobUrl);
-      }, 10000);
-      
-      console.log('✅ Download initiated');
-    } catch (error) {
-      console.error('Download error:', error);
-      // Fallback: Navigate to download endpoint
-      if (note._id || note.id) {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-        window.location.href = `${apiBase}/notes/${note._id || note.id}/download`;
-      } else {
-        window.open(originalPdfUrl, '_blank');
-      }
-    }
-  };
-
-  // Show error state only when loading is complete but no PDF available
-  if (!loading && (!note || !pdfUrl)) {
+  // Error state - no note or PDF
+  if (!loading && (!note || (!originalPdfUrl && !viewerUrl))) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
         <div className="text-center">
-          <FileText className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-          <p className="text-gray-400 mb-4">PDF not available</p>
+          <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+          <p className="text-white text-lg mb-2">PDF not available</p>
+          <p className="text-gray-400 mb-4">The document could not be loaded</p>
           <button
             onClick={() => router.push(`/notes/${noteId}`)}
             className="text-blue-400 hover:text-blue-300 flex items-center gap-2 mx-auto"
@@ -358,170 +395,176 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
 
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col">
-      {/* Top Header Bar */}
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-2 flex items-center justify-between z-50">
-        <div className="flex items-center gap-4">
+      {/* Header */}
+      <header className="bg-gray-800 border-b border-gray-700 px-3 sm:px-4 py-2 flex items-center justify-between z-50 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
           <button
             onClick={() => router.push(`/notes/${noteId}`)}
-            className="flex items-center gap-2 text-gray-300 hover:text-white transition"
+            className="flex items-center gap-1 sm:gap-2 text-gray-300 hover:text-white transition flex-shrink-0"
           >
             <ArrowLeft className="w-5 h-5" />
             <span className="hidden sm:inline">Back</span>
           </button>
-          <div className="hidden sm:block">
+          
+          <div className="min-w-0 flex-1">
             {note ? (
-              <>
-                <h1 className="text-white font-medium truncate max-w-md">{note.title}</h1>
-                <p className="text-gray-400 text-sm">{note.subject} • Sem {note.semester}</p>
-              </>
+              <div className="truncate">
+                <h1 className="text-white font-medium text-sm sm:text-base truncate">{note.title}</h1>
+                <p className="text-gray-400 text-xs sm:text-sm truncate">{note.subject} • Sem {note.semester}</p>
+              </div>
             ) : (
-              <>
-                <div className="w-48 h-5 bg-gray-700 rounded animate-pulse mb-1"></div>
-                <div className="w-32 h-4 bg-gray-700/50 rounded animate-pulse"></div>
-              </>
+              <div className="animate-pulse">
+                <div className="w-32 sm:w-48 h-4 sm:h-5 bg-gray-700 rounded mb-1"></div>
+                <div className="w-24 sm:w-32 h-3 sm:h-4 bg-gray-700/50 rounded"></div>
+              </div>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Zoom Controls - Hidden on mobile */}
-          <div className="hidden md:flex items-center gap-1 bg-gray-700 rounded-lg px-2 py-1">
-            <button className="p-1 text-gray-300 hover:text-white">
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="text-gray-300 text-sm px-2">100%</span>
-            <button className="p-1 text-gray-300 hover:text-white">
-              <ZoomIn className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Download Button */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Viewer Switch Button */}
+          <button
+            onClick={handleSwitchViewer}
+            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition"
+            title={`Current: ${viewerType === 'google' ? 'Google Docs' : viewerType === 'office' ? 'Office Online' : 'PDF.js'} - Click to switch`}
+          >
+            <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
+          
+          {/* Download Button - Green, prominent */}
           <button
             onClick={handleDownload}
-            disabled={!note}
-            className="p-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition disabled:opacity-50"
+            disabled={!note || isDownloading}
+            className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded-lg transition text-sm font-medium"
             title="Download PDF"
           >
-            <Download className="w-5 h-5" />
+            {isDownloading ? (
+              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 sm:w-5 sm:h-5" />
+            )}
+            <span className="hidden sm:inline">{isDownloading ? 'Downloading...' : 'Download'}</span>
           </button>
 
-          {/* AI Chat Toggle Button */}
+          {/* AI Chat Button */}
           <button
             onClick={() => setShowChat(!showChat)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
+            className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg font-medium transition text-sm ${
               showChat 
                 ? 'bg-blue-600 text-white' 
                 : 'bg-blue-500 hover:bg-blue-600 text-white'
             }`}
           >
-            <MessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5" />
             <span className="hidden sm:inline">AI Chat</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* PDF Viewer */}
-        <div 
-          className={`flex-1 transition-all duration-300 ease-in-out ${
-            showChat ? 'lg:w-[65%]' : 'w-full'
-          }`}
-        >
-          {/* Loading State - Show while fetching or while PDF loads */}
-          {(loading || pdfLoading) && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
-              <div className="text-center">
-                <Loader2 className="w-10 h-10 text-blue-500 animate-spin mx-auto mb-3" />
-                <p className="text-white text-base">{loading ? 'Loading...' : 'Rendering PDF...'}</p>
-                {!loading && (
+        <div className={`flex-1 relative transition-all duration-300 ${showChat ? 'lg:w-[60%]' : 'w-full'}`}>
+          {/* Loading Overlay */}
+          {(loading || pdfLoading) && !pdfError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+              <div className="text-center p-6">
+                <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+                <p className="text-white text-lg mb-2">
+                  {loading ? 'Loading document...' : 'Rendering PDF...'}
+                </p>
+                <p className="text-gray-400 text-sm mb-4">
+                  Using {viewerType === 'google' ? 'Google Docs' : viewerType === 'office' ? 'Office Online' : 'PDF.js'} Viewer
+                </p>
+                <p className="text-gray-500 text-xs mb-4">
+                  This may take a few seconds
+                </p>
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2 mx-auto text-sm"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Instead
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {/* Error State */}
+          {pdfError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900 z-10">
+              <div className="text-center p-6 max-w-md">
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <p className="text-white text-lg mb-2">Unable to preview PDF</p>
+                <p className="text-gray-400 text-sm mb-6">
+                  The document viewer encountered an issue. Try a different viewer or download the file.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={handleRetry}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2 justify-center"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                    Retry
+                  </button>
+                  <button
+                    onClick={() => {
+                      setRetryCount(0);
+                      handleSwitchViewer();
+                    }}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition flex items-center gap-2 justify-center"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Try Different Viewer
+                  </button>
                   <button
                     onClick={handleDownload}
-                    className="mt-3 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded-lg transition flex items-center gap-2 mx-auto"
+                    disabled={isDownloading}
+                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition flex items-center gap-2 justify-center"
                   >
                     <Download className="w-4 h-4" />
-                    Download Instead
+                    Download PDF
                   </button>
+                </div>
+                {originalPdfUrl && (
+                  <a
+                    href={originalPdfUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1 justify-center"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    Open in New Tab
+                  </a>
                 )}
               </div>
             </div>
           )}
           
-          {pdfError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 z-10">
-              <div className="text-center p-6 max-w-md">
-                <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-                <p className="text-white text-lg mb-2">Unable to preview PDF</p>
-                <p className="text-gray-400 text-sm mb-4">Your browser may not support inline PDF viewing</p>
-                <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <button
-                    onClick={() => {
-                      // Try different viewer
-                      if (originalPdfUrl) {
-                        if (viewerType !== 'google') {
-                          setViewerType('google');
-                          setPdfUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(originalPdfUrl)}&embedded=true`);
-                        } else {
-                          setViewerType('pdfjs');
-                          setPdfUrl(`https://mozilla.github.io/pdf.js/web/viewer.html?file=${encodeURIComponent(originalPdfUrl)}`);
-                        }
-                        setPdfError(false);
-                        setPdfLoading(true);
-                      }
-                    }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2 justify-center"
-                  >
-                    <RotateCw className="w-4 h-4" />
-                    Try Alternative Viewer
-                  </button>
-                  <a
-                    href={originalPdfUrl || ''}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition flex items-center gap-2 justify-center"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Open in New Tab
-                  </a>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Native browser PDF viewer (faster) with fallback */}
-          {pdfUrl && (
+          {/* PDF Iframe - Uses embedded viewer (Google Docs/Office/PDF.js) - never direct PDF URL */}
+          {viewerUrl && (
             <iframe
-              src={pdfUrl}
-              className="w-full h-full border-0"
+              ref={iframeRef}
+              src={viewerUrl}
+              className="w-full h-full border-0 bg-gray-800"
               title={note?.title || 'PDF Preview'}
-              allow="autoplay"
-              onLoad={() => {
-                // Clear the timeout since PDF loaded
-                if (pdfLoadTimeoutRef.current) {
-                  clearTimeout(pdfLoadTimeoutRef.current);
-                }
-                setPdfLoading(false);
-              }}
-              onError={() => {
-                // Clear timeout and show error
-                if (pdfLoadTimeoutRef.current) {
-                  clearTimeout(pdfLoadTimeoutRef.current);
-                }
-                setPdfLoading(false);
-                setPdfError(true);
-              }}
+              onLoad={handleIframeLoad}
+              onError={handleIframeError}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+              loading="eager"
+              style={{ minHeight: '100%' }}
             />
           )}
         </div>
 
-        {/* AI Chat Panel - Bottom sheet on mobile, side panel on desktop */}
+        {/* AI Chat Panel */}
         <div 
-          className={`fixed lg:relative right-0 bg-gray-800 border-l lg:border-l border-t lg:border-t-0 border-gray-700 flex flex-col transform transition-all duration-300 ease-in-out z-40 ${
+          className={`fixed lg:relative right-0 bg-gray-800 border-l border-gray-700 flex flex-col transform transition-all duration-300 ease-in-out z-40 ${
             showChat 
               ? 'translate-y-0 lg:translate-x-0' 
-              : 'translate-y-full lg:translate-x-full lg:hidden'
-          } bottom-0 lg:bottom-auto lg:inset-y-0 w-full lg:w-[35%] h-[60vh] lg:h-auto rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none`}
-          style={{ top: 'auto', maxHeight: 'calc(100vh - 57px)' }}
+              : 'translate-y-full lg:translate-x-full lg:hidden pointer-events-none'
+          } bottom-0 lg:bottom-auto lg:inset-y-0 w-full lg:w-[40%] h-[70vh] lg:h-auto rounded-t-2xl lg:rounded-none shadow-2xl lg:shadow-none`}
         >
           {/* Mobile drag handle */}
           <div className="lg:hidden flex justify-center pt-2 pb-1">
@@ -529,17 +572,17 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           </div>
           
           {/* Chat Header */}
-          <div className="bg-gray-750 border-b border-gray-700 p-4 pt-2 lg:pt-4 flex items-center justify-between">
+          <div className="border-b border-gray-700 p-3 sm:p-4 flex items-center justify-between flex-shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <Bot className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h3 className="text-white font-semibold flex items-center gap-2">
-                  AI Study Assistant
+                  AI Assistant
                   <Sparkles className="w-4 h-4 text-yellow-400" />
                 </h3>
-                <p className="text-gray-400 text-sm">{queriesLeft} queries left</p>
+                <p className="text-gray-400 text-xs">{queriesLeft} queries left</p>
               </div>
             </div>
             <button
@@ -550,18 +593,10 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
             </button>
           </div>
 
-          {/* Disclaimer */}
-          <div className="px-4 py-2 bg-yellow-900/20 border-b border-yellow-800/30">
-            <p className="text-yellow-500/80 text-xs flex items-start gap-2">
-              <span className="mt-0.5">⚠️</span>
-              <span>AI answers are based on general knowledge. Specific PDF content analysis requires text extraction.</span>
-            </p>
-          </div>
-
           {/* Chat Messages */}
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto p-4 space-y-4"
+            className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3"
           >
             {messages.map((message) => (
               <div
@@ -569,39 +604,24 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                  className={`max-w-[90%] rounded-2xl px-4 py-3 ${
                     message.role === 'user'
                       ? 'bg-blue-600 text-white rounded-br-md'
                       : 'bg-gray-700 text-gray-100 rounded-bl-md'
                   }`}
                 >
-                  {message.role === 'assistant' && (
-                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-600">
-                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
-                        <Bot className="w-3 h-3 text-white" />
-                      </div>
-                      <span className="text-sm font-medium text-gray-300">NoteMitra AI</span>
-                    </div>
-                  )}
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
-                  <p className="text-xs mt-2 opacity-60">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
                 </div>
               </div>
             ))}
             
-            {/* Typing Indicator */}
             {isTyping && (
               <div className="flex justify-start">
                 <div className="bg-gray-700 rounded-2xl rounded-bl-md px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                    </div>
-                    <span className="text-gray-400 text-sm">AI is thinking...</span>
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                   </div>
                 </div>
               </div>
@@ -609,37 +629,32 @@ Help the user understand the content. Explain topics clearly as a helpful tutor 
           </div>
 
           {/* Chat Input */}
-          <div className="p-4 border-t border-gray-700 bg-gray-800">
+          <div className="p-3 sm:p-4 border-t border-gray-700 flex-shrink-0">
             <div className="flex items-center gap-2">
               <input
-                ref={inputRef}
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask a question about this topic..."
+                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                placeholder="Ask a question..."
                 disabled={isTyping || queriesLeft <= 0}
-                className="flex-1 bg-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className="flex-1 bg-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 text-sm"
               />
               <button
                 onClick={handleSendMessage}
                 disabled={!inputMessage.trim() || isTyping || queriesLeft <= 0}
-                className="p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl transition"
+                className="p-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded-xl transition"
               >
                 <Send className="w-5 h-5" />
               </button>
             </div>
-            {queriesLeft <= 0 && (
-              <p className="text-red-400 text-xs mt-2">You've used all your queries. Refresh to reset.</p>
-            )}
           </div>
         </div>
 
-        {/* Mobile Overlay when chat is open */}
+        {/* Mobile overlay when chat is open */}
         {showChat && (
           <div 
             className="fixed inset-0 bg-black/50 lg:hidden z-30"
-            style={{ top: '57px' }}
             onClick={() => setShowChat(false)}
           />
         )}

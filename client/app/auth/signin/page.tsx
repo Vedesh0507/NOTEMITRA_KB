@@ -48,17 +48,18 @@ export default function SignInPage() {
       if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
         setError('Cannot connect to server. Please make sure the backend is running.');
       } else if (error.response?.status === 401) {
-        // Check if it's wrong password or wrong email
-        const errorMessage = error.response?.data?.message || error.response?.data?.error || '';
-        if (errorMessage.toLowerCase().includes('password')) {
-          setError('Invalid password. Please try again.');
-        } else if (errorMessage.toLowerCase().includes('user') || errorMessage.toLowerCase().includes('email') || errorMessage.toLowerCase().includes('not found')) {
-          setError('Email not found. Please check your email or create an account.');
+        // Use server error code for consistent messaging
+        const errorCode = error.response?.data?.error;
+        if (errorCode === 'INVALID_CREDENTIALS') {
+          setError('Invalid email or password. Please check your credentials and try again.');
         } else {
           setError('Invalid email or password. Please try again.');
         }
+      } else if (error.response?.status === 403) {
+        // Account suspended
+        setError(error.response?.data?.message || 'Your account has been suspended. Please contact admin.');
       } else {
-        setError(error.response?.data?.message || error.response?.data?.error || 'Failed to sign in. Please check your credentials.');
+        setError(error.response?.data?.message || 'Failed to sign in. Please try again.');
       }
     } finally {
       setLoading(false);

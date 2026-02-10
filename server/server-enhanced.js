@@ -797,14 +797,30 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid email format' });
     }
 
-    if (useMongoDB) {
+    // Check actual MongoDB connection state - useMongoDB might be true but connection could be lost
+    const mongoConnected = useMongoDB && mongoose.connection.readyState === 1;
+    
+    if (mongoConnected) {
       // MongoDB version - optimized with select() for faster query
-      const user = await User.findOne({ email: email.toLowerCase().trim() })
-        .select('_id name email password role branch section isAdmin isSuspended')
-        .lean();
+      let user;
+      try {
+        user = await User.findOne({ email: email.toLowerCase().trim() })
+          .select('_id name email password role branch section isAdmin isSuspended')
+          .lean();
+      } catch (dbError) {
+        console.error('❌ MongoDB query error:', dbError.message);
+        return res.status(500).json({ 
+          message: 'Database connection error. Please try again.',
+          error: 'DATABASE_ERROR'
+        });
+      }
+      
       if (!user) {
         console.log('❌ Login failed: User not found for email:', email.toLowerCase().trim());
-        return res.status(401).json({ message: 'Invalid email or password' });
+        return res.status(401).json({ 
+          message: 'Invalid credentials. Please check your email and password.',
+          error: 'INVALID_CREDENTIALS'
+        });
       }
 
       console.log('✅ User found:', user.name, '| Checking password...');
@@ -812,13 +828,19 @@ app.post('/api/auth/login', async (req, res) => {
       // Check if user is suspended
       if (user.isSuspended) {
         console.log('❌ Login failed: User is suspended');
-        return res.status(403).json({ message: 'Your account has been suspended. Please contact admin.' });
+        return res.status(403).json({ 
+          message: 'Your account has been suspended. Please contact admin.',
+          error: 'ACCOUNT_SUSPENDED'
+        });
       }
 
       // Check password (simple comparison - in production use bcrypt)
       if (user.password !== password) {
         console.log('❌ Login failed: Password mismatch');
-        return res.status(401).json({ message: 'Invalid email or password' });
+        return res.status(401).json({ 
+          message: 'Invalid credentials. Please check your email and password.',
+          error: 'INVALID_CREDENTIALS'
+        });
       }
 
       console.log('✅ Login successful for:', user.email);
@@ -833,17 +855,26 @@ app.post('/api/auth/login', async (req, res) => {
       // In-memory version - case-insensitive email search
       const user = users.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
       if (!user) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ 
+          message: 'Invalid credentials. Please check your email and password.',
+          error: 'INVALID_CREDENTIALS'
+        });
       }
 
       // Check if user is suspended
       if (user.isSuspended) {
-        return res.status(403).json({ message: 'Your account has been suspended. Please contact admin.' });
+        return res.status(403).json({ 
+          message: 'Your account has been suspended. Please contact admin.',
+          error: 'ACCOUNT_SUSPENDED'
+        });
       }
 
       // Check password (simple comparison - in production use bcrypt)
       if (user.password !== password) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+        return res.status(401).json({ 
+          message: 'Invalid credentials. Please check your email and password.',
+          error: 'INVALID_CREDENTIALS'
+        });
       }
 
       const token = 'dev_token_' + user.id;
@@ -4089,21 +4120,29 @@ app.delete('/api/comments/:commentId', async (req, res) => {
   }
 });
 
-// Leaderboard endpoint - calculates stats from actual notes
+// Leaderboard endpoint - calculates stats from actual notes in real-time
 app.get('/api/leaderboard', async (req, res) => {
   try {
-    // Cache for 60 seconds - leaderboard doesn't need real-time updates
-    res.set('Cache-Control', 'public, max-age=60');
+    // No caching - leaderboard should update in real-time for accurate rankings
+    res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
     
     if (useMongoDB) {
       // MongoDB version - aggregate actual data from notes collection
+      // This calculates rankings based on:
+      // 1. Total Downloads (primary sort - descending)
+      // 2. Average Downloads per Note (secondary sort - descending)
+      // 3. First Upload Date (tertiary sort - earlier uploads win ties)
       const noteStats = await Note.aggregate([
         {
           $group: {
             _id: '$userId',
             userName: { $first: '$userName' },
             notesUploaded: { $sum: 1 },
-            totalDownloads: { $sum: { $ifNull: ['$downloads', 0] } }
+            totalDownloads: { $sum: { $ifNull: ['$downloads', 0] } },
+            // Get the earliest upload date for tie-breaking
+            firstUploadDate: { $min: '$createdAt' }
           }
         },
         {
@@ -4113,61 +4152,87 @@ app.get('/api/leaderboard', async (req, res) => {
         }
       ]);
 
-      // Get user details for join dates
+      // Get user details for names (in case userName on notes is outdated)
       const userIds = noteStats.map(stat => stat._id).filter(id => id);
-      const users = await User.find({ _id: { $in: userIds } }).select('name createdAt').lean();
+      const users = await User.find({ _id: { $in: userIds } }).select('name').lean();
       const userMap = {};
       users.forEach(user => {
         userMap[user._id.toString()] = user;
       });
 
-      // Calculate average and sort
+      // Calculate average and sort according to ranking rules
       const rankedUsers = noteStats
         .map(stat => {
           const user = userMap[stat._id?.toString()] || {};
+          const totalDownloads = stat.totalDownloads || 0;
+          const notesUploaded = stat.notesUploaded || 0;
           return {
             name: user.name || stat.userName || 'Unknown User',
-            totalDownloads: stat.totalDownloads || 0,
-            notesUploaded: stat.notesUploaded || 0,
-            avgDownloads: stat.notesUploaded > 0 ? stat.totalDownloads / stat.notesUploaded : 0,
-            joinDate: user.createdAt
+            totalDownloads: totalDownloads,
+            notesUploaded: notesUploaded,
+            avgDownloads: notesUploaded > 0 ? Math.round((totalDownloads / notesUploaded) * 100) / 100 : 0,
+            // Use firstUploadDate for tie-breaking (earlier uploads rank higher)
+            joinDate: stat.firstUploadDate || new Date()
           };
         })
         .sort((a, b) => {
-          // Sort by total downloads (descending)
+          // 1. Sort by total downloads (descending) - most downloads wins
           if (b.totalDownloads !== a.totalDownloads) {
             return b.totalDownloads - a.totalDownloads;
           }
-          // If equal, sort by average downloads (descending)
+          // 2. If equal, sort by average downloads (descending) - quality matters
           if (b.avgDownloads !== a.avgDownloads) {
             return b.avgDownloads - a.avgDownloads;
           }
-          // If still equal, sort by join date (earlier first)
+          // 3. If still equal, sort by first upload date (ascending) - earlier uploads win
           return new Date(a.joinDate) - new Date(b.joinDate);
         });
 
+      console.log(`📊 Leaderboard calculated: ${rankedUsers.length} users ranked`);
       res.json({ leaderboard: rankedUsers });
     } else {
-      // In-memory version
-      const leaderboard = users
-        .filter(user => (user.notesUploaded || 0) > 0)
+      // In-memory version - calculate from notes array
+      const userStatsMap = {};
+      
+      // Aggregate stats from notes
+      notes.forEach(note => {
+        if (!note.userId) return;
+        const key = String(note.userId);
+        if (!userStatsMap[key]) {
+          userStatsMap[key] = {
+            name: note.userName || 'Unknown User',
+            totalDownloads: 0,
+            notesUploaded: 0,
+            firstUploadDate: note.createdAt || new Date()
+          };
+        }
+        userStatsMap[key].notesUploaded++;
+        userStatsMap[key].totalDownloads += (note.downloads || 0);
+        // Track earliest upload
+        if (note.createdAt && new Date(note.createdAt) < new Date(userStatsMap[key].firstUploadDate)) {
+          userStatsMap[key].firstUploadDate = note.createdAt;
+        }
+      });
+
+      const leaderboard = Object.values(userStatsMap)
+        .filter(user => user.notesUploaded > 0)
         .map(user => ({
           name: user.name,
-          totalDownloads: user.totalDownloads || 0,
-          notesUploaded: user.notesUploaded || 0,
-          avgDownloads: (user.notesUploaded || 0) > 0 ? (user.totalDownloads || 0) / (user.notesUploaded || 0) : 0,
-          joinDate: user.createdAt
+          totalDownloads: user.totalDownloads,
+          notesUploaded: user.notesUploaded,
+          avgDownloads: user.notesUploaded > 0 ? Math.round((user.totalDownloads / user.notesUploaded) * 100) / 100 : 0,
+          joinDate: user.firstUploadDate
         }))
         .sort((a, b) => {
-          // Sort by total downloads (descending)
+          // 1. Sort by total downloads (descending)
           if (b.totalDownloads !== a.totalDownloads) {
             return b.totalDownloads - a.totalDownloads;
           }
-          // If equal, sort by average downloads (descending)
+          // 2. If equal, sort by average downloads (descending)
           if (b.avgDownloads !== a.avgDownloads) {
             return b.avgDownloads - a.avgDownloads;
           }
-          // If still equal, sort by join date (earlier first)
+          // 3. If still equal, sort by first upload date (ascending)
           return new Date(a.joinDate) - new Date(b.joinDate);
         });
 

@@ -62,13 +62,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Try to get current user with stored token
       const response = await authAPI.getCurrentUser();
       setUser(response.data.user);
-    } catch (error) {
+      
+      // Also update stored user data
+      if (response.data.user) {
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+      }
+    } catch (error: any) {
       console.error('Auth check failed:', error);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+      
+      // Only clear token if it's definitively invalid (not just network error)
+      const status = error?.response?.status;
+      const errorCode = error?.response?.data?.error;
+      
+      // Clear ONLY on definitive token invalidity (401 with specific error codes)
+      // Don't clear on network errors, server errors, or timeouts
+      if (status === 401 && (
+        errorCode === 'INVALID_TOKEN_FORMAT' ||
+        errorCode === 'TOKEN_EXPIRED' ||
+        errorCode === 'NO_TOKEN' ||
+        errorCode === 'INVALID_USER_ID'
+      )) {
+        console.log('Token is invalid, clearing auth state');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } else if (status === 404) {
+        // User not found - account deleted
+        console.log('User not found, clearing auth state');
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
+      } else {
+        // For network errors, server errors, etc., try to use cached user data
+        const cachedUser = localStorage.getItem('user');
+        if (cachedUser) {
+          try {
+            setUser(JSON.parse(cachedUser));
+            console.log('Using cached user data due to network/server error');
+          } catch (e) {
+            console.error('Failed to parse cached user');
+          }
+        }
       }
     } finally {
       setLoading(false);
