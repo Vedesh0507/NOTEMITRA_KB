@@ -624,7 +624,7 @@ export default function NoteDetailPage() {
       <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
         {/* Back Button */}
         <button
-          onClick={() => router.back()}
+          onClick={() => router.push('/browse')}
           className="text-blue-600 hover:text-blue-700 mb-4 sm:mb-6 flex items-center gap-2 text-sm sm:text-base"
         >
           ← Back to Browse

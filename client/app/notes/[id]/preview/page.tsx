@@ -324,10 +324,18 @@ export default function PDFPreviewPage() {
     setQueriesLeft(prev => prev - 1);
 
     try {
+      // Validate API key is present
+      if (!GROQ_API_KEY) {
+        console.error('GROQ_API_KEY is not configured. Please set NEXT_PUBLIC_GROQ_API_KEY environment variable.');
+        throw new Error('AI service not configured');
+      }
+
       const systemPrompt = note 
         ? `You are a helpful study assistant. The user is studying "${note.title}" (${note.subject}, Semester ${note.semester}). Help explain concepts clearly and concisely.`
         : 'You are a helpful study assistant.';
 
+      console.log('🤖 Sending message to Groq API...');
+      
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -351,6 +359,7 @@ export default function PDFPreviewPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('✅ Groq API response received');
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
@@ -359,13 +368,19 @@ export default function PDFPreviewPage() {
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else {
-        throw new Error('API request failed');
+        const errorData = await response.text();
+        console.error('❌ Groq API error:', response.status, errorData);
+        throw new Error(`API error: ${response.status}`);
       }
     } catch (error) {
+      console.error('❌ AI Chat error:', error);
+      const errorMessage = error instanceof Error && error.message === 'AI service not configured'
+        ? 'AI service is not configured. Please contact the administrator.'
+        : 'Sorry, I encountered an error. Please try again.';
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: errorMessage,
         timestamp: new Date()
       }]);
     } finally {
