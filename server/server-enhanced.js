@@ -568,14 +568,18 @@ app.get('/api/health', (req, res) => {
 
     // Check actual MongoDB connection state
     const mongoConnected = mongoose.connection.readyState === 1;
-    const uploadsEnabled = useMongoDB && mongoConnected && gridfsBucket !== undefined;
+    const gridfsReady = useMongoDB && mongoConnected && gridfsBucket !== undefined;
     
-    // Check Cloudinary configuration
+    // Check Cloudinary configuration - this is the PRIMARY upload method
     const cloudinaryConfigured = !!(
       process.env.CLOUDINARY_CLOUD_NAME && 
       process.env.CLOUDINARY_API_KEY && 
       process.env.CLOUDINARY_API_SECRET
     );
+    
+    // Uploads are enabled if EITHER GridFS OR Cloudinary is available
+    // Cloudinary is preferred and doesn't require MongoDB to upload files
+    const uploadsEnabled = cloudinaryConfigured || gridfsReady;
     
     const responseTime = Date.now() - startTime;
     
@@ -590,7 +594,7 @@ app.get('/api/health', (req, res) => {
       environment: process.env.NODE_ENV || 'development',
       authenticated: tokenValid,
       tokenInfo: tokenInfo,
-      uploadsEnabled: uploadsEnabled || cloudinaryConfigured,
+      uploadsEnabled: uploadsEnabled,
       database: {
         type: useMongoDB ? 'MongoDB' : 'In-Memory',
         connected: mongoConnected,
@@ -599,13 +603,14 @@ app.get('/api/health', (req, res) => {
       services: {
         api: 'operational',
         database: mongoConnected ? 'operational' : (useMongoDB ? 'degraded' : 'in-memory'),
-        fileStorage: cloudinaryConfigured ? 'operational' : (uploadsEnabled ? 'operational' : 'disabled'),
-        uploads: (uploadsEnabled || cloudinaryConfigured) ? 'operational' : 'disabled'
+        fileStorage: cloudinaryConfigured ? 'operational' : (gridfsReady ? 'operational' : 'disabled'),
+        uploads: uploadsEnabled ? 'operational' : 'disabled'
       },
       storage: {
         cloudinary: cloudinaryConfigured,
-        gridfs: uploadsEnabled,
-        enabled: uploadsEnabled || cloudinaryConfigured
+        gridfs: gridfsReady,
+        enabled: uploadsEnabled,
+        primary: cloudinaryConfigured ? 'cloudinary' : (gridfsReady ? 'gridfs' : 'none')
       }
     };
     

@@ -51,21 +51,47 @@ export default function UploadPage() {
     setFormData(prev => ({ ...prev, subject: '' }));
   }, [formData.branch, formData.semester]);
 
-  // Check if uploads are enabled (MongoDB connected)
+  // Check if uploads are enabled with retry logic
   useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 2000;
+    let isMounted = true;
+    
     const checkUploadStatus = async () => {
       try {
         const response = await api.get('/health');
-        setUploadsEnabled(response.data.uploadsEnabled === true);
+        const enabled = response.data.uploadsEnabled === true;
+        
+        if (isMounted) {
+          if (!enabled && retryCount < maxRetries) {
+            retryCount++;
+            console.log(`Upload status: not ready, retry ${retryCount}/${maxRetries}`);
+            setTimeout(checkUploadStatus, retryDelay);
+          } else {
+            // Either enabled OR exhausted retries - allow uploads anyway
+            setUploadsEnabled(enabled || retryCount >= maxRetries);
+            setCheckingStatus(false);
+          }
+        }
       } catch (err) {
-        console.error('Failed to check upload status:', err);
-        setUploadsEnabled(false);
-      } finally {
-        setCheckingStatus(false);
+        console.error('Health check failed:', err);
+        if (isMounted) {
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(checkUploadStatus, retryDelay);
+          } else {
+            // Default to allowing uploads - let the actual upload handle errors
+            setUploadsEnabled(true);
+            setCheckingStatus(false);
+          }
+        }
       }
     };
     
     checkUploadStatus();
+    
+    return () => { isMounted = false; };
   }, []);
 
   // Redirect if not logged in - use useEffect for client-side navigation
@@ -354,15 +380,14 @@ export default function UploadPage() {
           <p className="text-sm sm:text-base text-gray-600">Share your study materials with fellow students</p>
         </div>
 
-        {/* Uploads Disabled Warning */}
+        {/* Uploads Status Info - Now just informational, not blocking */}
         {uploadsEnabled === false && !checkingStatus && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-            <Database className="w-5 h-5 text-amber-600 mt-0.5" />
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <Database className="w-5 h-5 text-blue-600 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-amber-900">Uploads Temporarily Unavailable</h3>
-              <p className="text-amber-700 text-sm">
-                The file storage system is currently unavailable. This usually means the database is being updated or maintained.
-                Please try again in a few minutes.
+              <h3 className="font-semibold text-blue-900">Connection Status</h3>
+              <p className="text-blue-700 text-sm">
+                The server connection may be slow. You can still try uploading - if there's an issue, you'll see an error message.
               </p>
             </div>
           </div>
@@ -674,8 +699,8 @@ export default function UploadPage() {
             </Button>
             <Button 
               type="submit" 
-              disabled={uploading || !selectedFile || uploadsEnabled === false || fileTooLarge}
-              title={uploadsEnabled === false ? 'Uploads are temporarily unavailable' : fileTooLarge ? 'Please compress your PDF first' : undefined}
+              disabled={uploading || !selectedFile || fileTooLarge}
+              title={fileTooLarge ? 'Please compress your PDF first' : undefined}
             >
               {uploading ? (
                 <>
@@ -686,11 +711,6 @@ export default function UploadPage() {
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Checking...
-                </>
-              ) : uploadsEnabled === false ? (
-                <>
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  Uploads Unavailable
                 </>
               ) : (
                 <>
