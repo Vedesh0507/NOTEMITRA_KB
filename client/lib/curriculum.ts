@@ -613,15 +613,19 @@ export const CURRICULUM: CurriculumData = {
 
 // Helper function to get subjects for a specific branch and semester
 export function getSubjectsForBranchAndSemester(branch: string, semester: string): string[] {
-  if (!branch || !semester) return [];
+  if (!branch || !semester) return ['Assignments'];
   const branchData = CURRICULUM[branch];
-  if (!branchData) return [];
-  return branchData[semester] || [];
+  if (!branchData) return ['Assignments'];
+  const subjects = branchData[semester] || [];
+  // Always include "Assignments" as an option for all branches and semesters
+  return [...subjects, 'Assignments'];
 }
 
 // Helper function to get all unique subjects across all branches and semesters
 export function getAllSubjects(): string[] {
   const allSubjects = new Set<string>();
+  // Always include "Assignments" as an option
+  allSubjects.add('Assignments');
   Object.values(CURRICULUM).forEach(branchData => {
     Object.values(branchData).forEach(subjects => {
       subjects.forEach(subject => allSubjects.add(subject));
