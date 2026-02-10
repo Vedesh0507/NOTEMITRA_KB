@@ -492,6 +492,7 @@ async function connectMongoDB() {
       downvotes: { type: Number, default: 0 },
       likedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track who liked
       viewedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track unique viewers
+      downloadedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Track unique downloaders
       isApproved: { type: Boolean, default: true },
       isReported: { type: Boolean, default: false },
       reportReason: String,
@@ -2819,11 +2820,20 @@ app.get('/api/notes/:noteId/download', async (req, res) => {
   }
 });
 
-// Track note download
+// Track note download - Only counts UNIQUE downloads per user per note
 app.post('/api/notes/:id/download', async (req, res) => {
   try {
     const noteId = req.params.id;
     const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    // Get user ID from token
+    let userId = null;
+    if (token && token.startsWith('dev_token_') && !token.includes('expired')) {
+      const userIdStr = token.replace('dev_token_', '');
+      if (mongoose.Types.ObjectId.isValid(userIdStr)) {
+        userId = userIdStr;
+      }
+    }
 
     if (useMongoDB) {
       // Validate ObjectId format
@@ -2831,18 +2841,40 @@ app.post('/api/notes/:id/download', async (req, res) => {
         return res.status(400).json({ message: 'Invalid note ID format' });
       }
 
-      // Increment download count for the note
-      const note = await Note.findByIdAndUpdate(
-        noteId,
-        { $inc: { downloads: 1 } },
-        { new: true }
-      ).lean();
-
-      if (!note) {
+      // First, check if this user already downloaded this note
+      const existingNote = await Note.findById(noteId).lean();
+      
+      if (!existingNote) {
         return res.status(404).json({ message: 'Note not found' });
       }
 
-      // Update uploader's totalDownloads
+      // Check if user already downloaded (for logged-in users)
+      const alreadyDownloaded = userId && existingNote.downloadedBy && 
+        existingNote.downloadedBy.some(id => id.toString() === userId);
+
+      if (alreadyDownloaded) {
+        // User already downloaded this note - don't increment
+        console.log(`📥 Download tracked (already counted) - Note: ${noteId}, User: ${userId}`);
+        return res.json({ 
+          message: 'Download already tracked', 
+          downloads: existingNote.downloads,
+          alreadyCounted: true 
+        });
+      }
+
+      // New unique download - increment count and add user to downloadedBy
+      const updateQuery = { $inc: { downloads: 1 } };
+      if (userId) {
+        updateQuery.$addToSet = { downloadedBy: userId };
+      }
+
+      const note = await Note.findByIdAndUpdate(
+        noteId,
+        updateQuery,
+        { new: true }
+      ).lean();
+
+      // Update uploader's totalDownloads (only for new unique downloads)
       if (note.userId) {
         await User.findByIdAndUpdate(
           note.userId,
@@ -2850,13 +2882,23 @@ app.post('/api/notes/:id/download', async (req, res) => {
         );
       }
 
-      res.json({ message: 'Download tracked', downloads: note.downloads });
+      console.log(`📥 NEW Download tracked - Note: ${noteId}, User: ${userId || 'anonymous'}, Total: ${note.downloads}`);
+      res.json({ message: 'Download tracked', downloads: note.downloads, alreadyCounted: false });
     } else {
+      // In-memory version - track downloads per user
       const note = notes.find(n => n.id === parseInt(noteId));
       if (note) {
+        if (!note.downloadedBy) note.downloadedBy = [];
+        
+        if (userId && note.downloadedBy.includes(userId)) {
+          // Already downloaded
+          return res.json({ message: 'Download already tracked', alreadyCounted: true });
+        }
+        
         note.downloads = (note.downloads || 0) + 1;
+        if (userId) note.downloadedBy.push(userId);
       }
-      res.json({ message: 'Download tracked' });
+      res.json({ message: 'Download tracked', alreadyCounted: false });
     }
   } catch (error) {
     console.error('Track download error:', error);
@@ -4252,27 +4294,49 @@ app.get('/api/leaderboard', async (req, res) => {
 app.get('/api/notes/:id/download', async (req, res) => {
   try {
     const noteId = req.params.id;
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    // Get user ID from token
+    let userId = null;
+    if (token && token.startsWith('dev_token_') && !token.includes('expired')) {
+      const userIdStr = token.replace('dev_token_', '');
+      if (mongoose.Types.ObjectId.isValid(userIdStr)) {
+        userId = userIdStr;
+      }
+    }
 
     if (useMongoDB) {
-      // MongoDB version
-      const note = await Note.findByIdAndUpdate(
-        noteId,
-        { $inc: { downloads: 1 } },
-        { new: true }
-      );
-
-      if (!note) {
+      // MongoDB version - check for unique download
+      const existingNote = await Note.findById(noteId).lean();
+      
+      if (!existingNote) {
         return res.status(404).json({ message: 'Note not found' });
       }
 
-      // Increment the note uploader's totalDownloads
-      await User.findByIdAndUpdate(note.userId, { $inc: { totalDownloads: 1 } });
+      // Check if user already downloaded (for logged-in users)
+      const alreadyDownloaded = userId && existingNote.downloadedBy && 
+        existingNote.downloadedBy.some(id => id.toString() === userId);
+
+      if (!alreadyDownloaded) {
+        // New unique download - increment count
+        const updateQuery = { $inc: { downloads: 1 } };
+        if (userId) {
+          updateQuery.$addToSet = { downloadedBy: userId };
+        }
+
+        await Note.findByIdAndUpdate(noteId, updateQuery);
+
+        // Increment the note uploader's totalDownloads
+        if (existingNote.userId) {
+          await User.findByIdAndUpdate(existingNote.userId, { $inc: { totalDownloads: 1 } });
+        }
+      }
 
       // If note has fileId (GridFS), provide download endpoint, otherwise use fileUrl
-      if (note.fileId) {
-        res.json({ downloadUrl: `/api/notes/download-pdf/${note.fileId}`, useGridFS: true });
+      if (existingNote.fileId) {
+        res.json({ downloadUrl: `/api/notes/download-pdf/${existingNote.fileId}`, useGridFS: true });
       } else {
-        res.json({ downloadUrl: note.fileUrl || '/sample.pdf', useGridFS: false });
+        res.json({ downloadUrl: existingNote.cloudinaryUrl || existingNote.fileUrl || '/sample.pdf', useGridFS: false });
       }
     } else {
       // In-memory version
@@ -4281,13 +4345,19 @@ app.get('/api/notes/:id/download', async (req, res) => {
         return res.status(404).json({ message: 'Note not found' });
       }
 
-      note.downloads += 1;
+      // Check for unique download
+      if (!note.downloadedBy) note.downloadedBy = [];
+      
+      if (!userId || !note.downloadedBy.includes(userId)) {
+        note.downloads = (note.downloads || 0) + 1;
+        if (userId) note.downloadedBy.push(userId);
 
-      // Increment the note uploader's totalDownloads
-      const uploader = users.find(u => u.id === note.userId);
-      if (uploader) {
-        if (!uploader.totalDownloads) uploader.totalDownloads = 0;
-        uploader.totalDownloads += 1;
+        // Increment the note uploader's totalDownloads
+        const uploader = users.find(u => u.id === note.userId);
+        if (uploader) {
+          if (!uploader.totalDownloads) uploader.totalDownloads = 0;
+          uploader.totalDownloads += 1;
+        }
       }
 
       res.json({ downloadUrl: note.fileUrl || '/sample.pdf' });
