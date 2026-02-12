@@ -41,8 +41,6 @@ interface ChatMessage {
   timestamp: Date;
 }
 
-const GROQ_API_KEY = process.env.NEXT_PUBLIC_GROQ_API_KEY || '';
-
 export default function PDFPreviewPage() {
   const params = useParams();
   const router = useRouter();
@@ -324,53 +322,42 @@ export default function PDFPreviewPage() {
     setQueriesLeft(prev => prev - 1);
 
     try {
-      // Validate API key is present
-      if (!GROQ_API_KEY) {
-        console.error('GROQ_API_KEY is not configured. Please set NEXT_PUBLIC_GROQ_API_KEY environment variable.');
-        throw new Error('AI service not configured');
-      }
-
-      const systemPrompt = note 
-        ? `You are a helpful study assistant. The user is studying "${note.title}" (${note.subject}, Semester ${note.semester}). Help explain concepts clearly and concisely.`
-        : 'You are a helpful study assistant.';
-
-      console.log('🤖 Sending message to Groq API...');
+      console.log('🤖 Sending message to Chat API...');
       
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      // Call our Next.js API route (avoids CORS issues with Groq)
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
           messages: [
-            { role: 'system', content: systemPrompt },
             ...messages.filter(m => m.id !== 'welcome').map(m => ({
               role: m.role,
               content: m.content
             })),
             { role: 'user', content: userMessage.content }
           ],
-          max_tokens: 1024,
-          temperature: 0.7,
+          noteTitle: note?.title,
+          subject: note?.subject,
+          semester: note?.semester,
         }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log('✅ Groq API response received');
+        console.log('✅ Chat API response received');
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.choices[0]?.message?.content || 'Sorry, I could not generate a response.',
+          content: data.content || 'Sorry, I could not generate a response.',
           timestamp: new Date()
         };
         setMessages(prev => [...prev, assistantMessage]);
       } else {
-        const errorData = await response.text();
-        console.error('❌ Groq API error:', response.status, errorData);
-        throw new Error(`API error: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Chat API error:', response.status, errorData);
+        throw new Error(errorData.error || `API error: ${response.status}`);
       }
     } catch (error) {
       console.error('❌ AI Chat error:', error);
