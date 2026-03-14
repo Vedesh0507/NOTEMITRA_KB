@@ -1,0 +1,18 @@
+# Ignore patterns for Vercel builds
+uploads
+pdfs
+storage
+tmp
+temp
+*.pdf
+node_modules
+.next
+.git
+__tests__
+*.test.js
+*.test.ts
+*.spec.js
+*.spec.ts
+coverage
+.env.local
+.env.development.local
