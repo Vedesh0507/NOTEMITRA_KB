@@ -32,8 +32,8 @@ interface Note {
   semester: string;
   module: string;
   branch: string;
-  userName: string;
-  userId: number | string; // Can be ObjectId string
+  uploaderName: string;
+  uploaderId: number | string; // Can be ObjectId string
   views: number;
   downloads: number;
   upvotes: number;
@@ -669,7 +669,7 @@ export default function NoteDetailPage() {
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs sm:text-sm text-gray-600">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span>{note.userName}</span>
+                  <span>{note.uploaderName}</span>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

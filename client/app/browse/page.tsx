@@ -16,8 +16,8 @@ interface Note {
   semester: string;
   module: string;
   branch: string;
-  userName: string;
-  userId: number | string;
+  uploaderName: string;
+  uploaderId: number | string;
   views: number;
   downloads: number;
   upvotes: number;
@@ -313,7 +313,7 @@ export default function BrowsePage() {
                   <div className="space-y-1.5 text-[10px] sm:text-xs text-gray-600 mb-2">
                     <div className="flex items-center gap-1">
                       <User className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">{note.userName}</span>
+                      <span className="truncate">{note.uploaderName}</span>
                     </div>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-medium">

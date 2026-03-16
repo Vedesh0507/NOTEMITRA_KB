@@ -741,9 +741,7 @@ export const getLeaderboard = async (_req: Request, res: Response): Promise<void
     const stats = await Note.aggregate([
       {
         $group: {
-          _id: '$userId',
-          userName: { $first: '$userName' },
-          uploaderId: { $first: '$uploaderId' },
+          _id: '$uploaderId',
           uploaderName: { $first: '$uploaderName' },
           totalDownloads: { $sum: '$downloads' },
           notesUploaded: { $sum: 1 },
@@ -758,7 +756,7 @@ export const getLeaderboard = async (_req: Request, res: Response): Promise<void
       const notesUploaded = stat.notesUploaded || 0;
       const totalDownloads = stat.totalDownloads || 0;
       return {
-        name: stat.uploaderName || stat.userName || 'Unknown User',
+        name: stat.uploaderName || 'Unknown User',
         totalDownloads,
         notesUploaded,
         avgDownloads: notesUploaded > 0
