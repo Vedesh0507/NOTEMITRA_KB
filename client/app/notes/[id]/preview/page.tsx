@@ -163,7 +163,7 @@ export default function PDFPreviewPage() {
         } else if (fetchedNote.fileUrl) {
           rawPdfUrl = fetchedNote.fileUrl;
         } else if (fetchedNote.fileId) {
-          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+          const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
           rawPdfUrl = `${apiBase}/notes/view-pdf/${fetchedNote.fileId}`;
         }
         

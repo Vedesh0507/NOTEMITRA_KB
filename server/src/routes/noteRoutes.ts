@@ -39,8 +39,8 @@ router.get('/', optionalAuthenticate, validateNoteQuery, getNotes);
 // Saved notes list (must be before /:id routes)
 router.get('/saved/list', authenticate, getSavedNotes);
 
-// Get single note
-router.get('/:id', validateMongoId, getNoteById);
+// Get single note (optionalAuthenticate to check if user has liked)
+router.get('/:id', optionalAuthenticate, validateMongoId, getNoteById);
 
 // Get download URL (GET) - authenticated only
 router.get('/:id/download', authenticate, validateMongoId, getDownloadUrl);

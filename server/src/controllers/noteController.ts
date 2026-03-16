@@ -255,7 +255,18 @@ export const getNoteById = async (req: Request, res: Response): Promise<void> =>
     await Note.findByIdAndUpdate(id, { $inc: { views: 1 } });
     note.views = (note.views || 0) + 1;
 
-    res.json({ note });
+    // Check if current user has liked this note
+    let userLiked = false;
+    if (req.user) {
+      const existingVote = await Vote.findOne({
+        userId: req.user._id,
+        noteId: id,
+        voteType: 'upvote'
+      });
+      userLiked = !!existingVote;
+    }
+
+    res.json({ note, userLiked });
   } catch (error: any) {
     console.error('Get note error:', error);
     res.status(500).json({ error: 'Failed to fetch note' });
@@ -341,16 +352,19 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
       noteId: id
     });
 
+    let userLiked = false;
+
     if (existingVote) {
       // Update vote
       if (existingVote.voteType === voteType) {
-        // Remove vote
+        // Remove vote (toggle off)
         await Vote.deleteOne({ _id: existingVote._id });
         if (voteType === 'upvote') {
           note.upvotes -= 1;
         } else {
           note.downvotes -= 1;
         }
+        userLiked = false;
       } else {
         // Change vote
         existingVote.voteType = voteType as 'upvote' | 'downvote';
@@ -358,9 +372,11 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
         if (voteType === 'upvote') {
           note.upvotes += 1;
           note.downvotes -= 1;
+          userLiked = true;
         } else {
           note.downvotes += 1;
           note.upvotes -= 1;
+          userLiked = false;
         }
       }
     } else {
@@ -372,10 +388,12 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
       });
       if (voteType === 'upvote') {
         note.upvotes += 1;
+        userLiked = true;
         // Increase uploader reputation
         await User.findByIdAndUpdate(note.uploaderId, { $inc: { reputation: 2 } });
       } else {
         note.downvotes += 1;
+        userLiked = false;
       }
     }
 
@@ -383,6 +401,11 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
 
     res.json({
       message: 'Vote recorded',
+      note: {
+        upvotes: note.upvotes,
+        downvotes: note.downvotes
+      },
+      userLiked,
       upvotes: note.upvotes,
       downvotes: note.downvotes
     });
@@ -591,7 +614,7 @@ export const getComments = async (req: Request, res: Response): Promise<void> =>
   try {
     const { id } = req.params;
 
-    const comments = await Comment.find({ noteId: id })
+    const comments = await Comment.find({ noteId: id, isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -738,6 +761,7 @@ export const reportNote = async (req: Request, res: Response): Promise<void> => 
 export const getLeaderboard = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Aggregate download stats from Notes collection grouped by uploader
+    // Use $lookup to reliably resolve user names from the User collection
     const stats = await Note.aggregate([
       {
         $group: {
@@ -749,14 +773,24 @@ export const getLeaderboard = async (_req: Request, res: Response): Promise<void
         }
       },
       { $sort: { totalDownloads: -1 } },
-      { $limit: 50 }
+      { $limit: 50 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userInfo'
+        }
+      }
     ]);
 
     const leaderboard = stats.map((stat: any) => {
       const notesUploaded = stat.notesUploaded || 0;
       const totalDownloads = stat.totalDownloads || 0;
+      // Prefer the name from the User collection, fall back to the denormalized uploaderName
+      const userName = stat.userInfo?.[0]?.name || stat.uploaderName || 'Unknown User';
       return {
-        name: stat.uploaderName || 'Unknown User',
+        name: userName,
         totalDownloads,
         notesUploaded,
         avgDownloads: notesUploaded > 0
