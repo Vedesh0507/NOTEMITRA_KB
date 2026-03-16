@@ -168,6 +168,11 @@ export default function NoteDetailPage() {
   };
 
   const handleDownload = async () => {
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+
     if (!note) {
       console.error('❌ No note object available for download');
       alert('Error: Note data not loaded. Please refresh the page.');
@@ -471,6 +476,11 @@ export default function NoteDetailPage() {
   };
 
   const handlePreview = () => {
+    if (!user) {
+      router.push('/auth/signin');
+      return;
+    }
+
     if (!note) return;
     
     // Navigate to the in-app preview page

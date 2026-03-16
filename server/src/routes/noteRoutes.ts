@@ -42,11 +42,11 @@ router.get('/saved/list', authenticate, getSavedNotes);
 // Get single note
 router.get('/:id', validateMongoId, getNoteById);
 
-// Get download URL (GET)
-router.get('/:id/download', validateMongoId, getDownloadUrl);
+// Get download URL (GET) - authenticated only
+router.get('/:id/download', authenticate, validateMongoId, getDownloadUrl);
 
-// Track download (POST)
-router.post('/:id/download', validateMongoId, trackDownload);
+// Track download (POST) - authenticated only
+router.post('/:id/download', authenticate, validateMongoId, trackDownload);
 
 // Vote on note
 router.post('/:id/vote', authenticate, validateMongoId, voteNote);

@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { notesAPI } from '@/lib/api';
+import { useAuth } from '@/lib/context/AuthContext';
 
 interface Note {
   id?: string;
@@ -45,7 +46,8 @@ export default function PDFPreviewPage() {
   const params = useParams();
   const router = useRouter();
   const noteId = params?.id as string;
-  
+  const { user, loading: authLoading } = useAuth();
+
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [originalPdfUrl, setOriginalPdfUrl] = useState<string | null>(null);
@@ -84,9 +86,16 @@ export default function PDFPreviewPage() {
     }
   }, []);
 
+  // Redirect to signin if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/signin');
+    }
+  }, [authLoading, user, router]);
+
   // Fetch note details on mount
   useEffect(() => {
-    if (noteId) {
+    if (noteId && user) {
       fetchNoteDetails();
     }
     
@@ -374,6 +383,15 @@ export default function PDFPreviewPage() {
       setIsTyping(false);
     }
   };
+
+  // Show loading while checking auth
+  if (authLoading || (!user && !authLoading)) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
 
   // Error state - no note or PDF
   if (!loading && (!note || (!originalPdfUrl && !viewerUrl))) {
