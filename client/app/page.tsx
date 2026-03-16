@@ -25,7 +25,7 @@ export default function HomePage() {
     // Fetch real user count from backend
     const fetchStats = async () => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://notemitra-kb.onrender.com';
         const res = await fetch(`${apiUrl}/api/public/stats`);
         if (res.ok) {
           const data = await res.json();
