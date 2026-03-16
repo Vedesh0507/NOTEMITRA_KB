@@ -387,7 +387,7 @@ export default function UploadPage() {
             <div>
               <h3 className="font-semibold text-blue-900">Connection Status</h3>
               <p className="text-blue-700 text-sm">
-                The server connection may be slow. You can still try uploading - if there's an issue, you'll see an error message.
+                The server connection may be slow. You can still try uploading - if there&apos;s an issue, you&apos;ll see an error message.
               </p>
             </div>
           </div>

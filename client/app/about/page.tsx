@@ -67,12 +67,12 @@ export default function AboutPage() {
               <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4">Built With Care</h2>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-3 sm:mb-4">
                 NoteMitra was created by students who understand the challenges of finding quality study materials. 
-                We've experienced the frustration of scattered resources and wanted to create a centralized platform 
+                We&apos;ve experienced the frustration of scattered resources and wanted to create a centralized platform 
                 that makes learning easier.
               </p>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed">
                 Every feature is designed with students in mind - from easy uploads to smart search, from community 
-                voting to reputation building. We're constantly improving to serve you better.
+                voting to reputation building. We&apos;re constantly improving to serve you better.
               </p>
             </div>
           </div>
@@ -126,7 +126,7 @@ export default function AboutPage() {
               Contact Us
             </h2>
             <p className="text-base sm:text-lg lg:text-xl text-gray-600">
-              Have questions or suggestions? We'd love to hear from you!
+              Have questions or suggestions? We&apos;d love to hear from you!
             </p>
           </div>
           
