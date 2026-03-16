@@ -8,7 +8,7 @@ const getApiUrl = () => {
       return `http://${hostname}:5000/api`;
     }
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  return process.env.NEXT_PUBLIC_API_URL || 'https://notemitra-kb.onrender.com/api';
 };
 
 const API_URL = getApiUrl();

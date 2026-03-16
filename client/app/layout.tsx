@@ -35,8 +35,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         {/* DNS prefetch for faster API calls */}
-        <link rel="dns-prefetch" href="//localhost:5001" />
-        <link rel="preconnect" href="//localhost:5001" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="//notemitra-kb.onrender.com" />
+        <link rel="preconnect" href="//notemitra-kb.onrender.com" crossOrigin="anonymous" />
       </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         <AuthProvider>
