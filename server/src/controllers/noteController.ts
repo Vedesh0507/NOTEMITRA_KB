@@ -184,14 +184,15 @@ export const getNotes = async (req: Request, res: Response): Promise<void> => {
       module,
       branch,
       uploaderRole,
-      sortBy = 'uploadDate',
+      sortBy = 'createdAt',
       sortOrder = 'desc',
       page = 1,
       limit = 100,
       search
     } = req.query;
 
-    const filter: any = { isApproved: true };
+    // Match notes that are approved OR have no isApproved field (legacy notes)
+    const filter: any = { $or: [{ isApproved: true }, { isApproved: { $exists: false } }] };
 
     if (subject) filter.subject = subject;
     if (semester) filter.semester = semester;
@@ -199,19 +200,32 @@ export const getNotes = async (req: Request, res: Response): Promise<void> => {
     if (branch) filter.branch = branch;
     if (uploaderRole) filter.uploaderRole = uploaderRole;
 
-    // Text search
-    if (search && typeof search === 'string') {
-      filter.$text = { $search: search };
+    // Text search — only use if the text index exists
+    if (search && typeof search === 'string' && search.trim()) {
+      // Use regex-based search as a reliable fallback instead of $text
+      const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [
+        { title: searchRegex },
+        { description: searchRegex },
+        { subject: searchRegex },
+        { tags: searchRegex },
+      ];
+    }
+
+    // Normalize sort field — map frontend values to actual DB fields
+    let sortField = sortBy as string;
+    if (sortField === 'uploadDate') {
+      sortField = 'createdAt'; // uploadDate may not exist on all notes; createdAt is always present
     }
 
     const sortOptions: any = {};
-    sortOptions[sortBy as string] = sortOrder === 'asc' ? 1 : -1;
+    sortOptions[sortField] = sortOrder === 'asc' ? 1 : -1;
 
     const pageNum = parseInt(page as string) || 1;
-    const limitNum = parseInt(limit as string) || 20;
+    const limitNum = parseInt(limit as string) || 100;
     const skip = (pageNum - 1) * limitNum;
 
-    const [notes, total] = await Promise.all([
+    const [rawNotes, total] = await Promise.all([
       Note.find(filter)
         .sort(sortOptions)
         .skip(skip)
@@ -220,6 +234,13 @@ export const getNotes = async (req: Request, res: Response): Promise<void> => {
         .lean(),
       Note.countDocuments(filter)
     ]);
+
+    // Normalize field names: handle both uploaderId/uploaderName and userId/userName
+    const notes = rawNotes.map((note: any) => ({
+      ...note,
+      uploaderId: note.uploaderId || note.userId,
+      uploaderName: note.uploaderName || note.userName,
+    }));
 
     res.json({
       notes,
@@ -255,7 +276,18 @@ export const getNoteById = async (req: Request, res: Response): Promise<void> =>
     await Note.findByIdAndUpdate(id, { $inc: { views: 1 } });
     note.views = (note.views || 0) + 1;
 
-    res.json({ note });
+    // Normalize field names: handle both uploaderId/uploaderName and userId/userName
+    note.uploaderId = note.uploaderId || note.userId;
+    note.uploaderName = note.uploaderName || note.userName;
+
+    // Check if the current user has liked the note
+    let userLiked = false;
+    if (req.user) {
+      const existingVote = await Vote.findOne({ userId: req.user._id, noteId: id, voteType: 'upvote' });
+      userLiked = !!existingVote;
+    }
+
+    res.json({ note, userLiked });
   } catch (error: any) {
     console.error('Get note error:', error);
     res.status(500).json({ error: 'Failed to fetch note' });
@@ -373,7 +405,10 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
       if (voteType === 'upvote') {
         note.upvotes += 1;
         // Increase uploader reputation
-        await User.findByIdAndUpdate(note.uploaderId, { $inc: { reputation: 2 } });
+        const noteUploaderId = note.uploaderId || (note as any).userId;
+        if (noteUploaderId) {
+          await User.findByIdAndUpdate(noteUploaderId, { $inc: { reputation: 2 } });
+        }
       } else {
         note.downvotes += 1;
       }
@@ -381,10 +416,16 @@ export const voteNote = async (req: Request, res: Response): Promise<void> => {
 
     await note.save();
 
+    // Determine if user currently has an upvote after this action
+    const currentVote = await Vote.findOne({ userId: req.user._id, noteId: id, voteType: 'upvote' });
+
     res.json({
       message: 'Vote recorded',
-      upvotes: note.upvotes,
-      downvotes: note.downvotes
+      note: {
+        upvotes: note.upvotes,
+        downvotes: note.downvotes,
+      },
+      userLiked: !!currentVote,
     });
   } catch (error: any) {
     console.error('Vote error:', error);
@@ -454,8 +495,9 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Check permission
-    const isOwner = note.uploaderId.toString() === (req.user._id as any).toString();
+    // Check permission — handle both uploaderId and userId field names
+    const noteOwnerId = note.uploaderId || (note as any).userId;
+    const isOwner = noteOwnerId && noteOwnerId.toString() === (req.user._id as any).toString();
     const isModerator = ['moderator', 'admin'].includes(req.user.role);
 
     if (!isOwner && !isModerator) {
@@ -478,7 +520,9 @@ export const deleteNote = async (req: Request, res: Response): Promise<void> => 
     await Note.deleteOne({ _id: id });
 
     // Update user upload count
-    await User.findByIdAndUpdate(note.uploaderId, { $inc: { uploadsCount: -1 } });
+    if (noteOwnerId) {
+      await User.findByIdAndUpdate(noteOwnerId, { $inc: { uploadsCount: -1 } });
+    }
 
     res.json({ message: 'Note deleted successfully' });
   } catch (error: any) {
@@ -548,6 +592,8 @@ export const getSavedNotes = async (req: Request, res: Response): Promise<void> 
     const notesList = savedNotes
       .map((sn: any) => ({
         ...sn.noteId,
+        uploaderId: sn.noteId?.uploaderId || sn.noteId?.userId,
+        uploaderName: sn.noteId?.uploaderName || sn.noteId?.userName,
         savedAt: sn.savedAt
       }))
       .filter((n: any) => n._id !== undefined);
@@ -738,11 +784,23 @@ export const reportNote = async (req: Request, res: Response): Promise<void> => 
 export const getLeaderboard = async (_req: Request, res: Response): Promise<void> => {
   try {
     // Aggregate download stats from Notes collection grouped by uploader
+    // Handle both field name variants: uploaderId/uploaderName (TS server) and userId/userName (enhanced server)
     const stats = await Note.aggregate([
       {
+        $addFields: {
+          normalizedUploaderId: { $ifNull: ['$uploaderId', '$userId'] },
+          normalizedUploaderName: { $ifNull: ['$uploaderName', '$userName'] },
+        }
+      },
+      {
+        $match: {
+          normalizedUploaderId: { $ne: null }
+        }
+      },
+      {
         $group: {
-          _id: '$uploaderId',
-          uploaderName: { $first: '$uploaderName' },
+          _id: '$normalizedUploaderId',
+          uploaderName: { $first: '$normalizedUploaderName' },
           totalDownloads: { $sum: '$downloads' },
           notesUploaded: { $sum: 1 },
           firstUploadDate: { $min: '$createdAt' },

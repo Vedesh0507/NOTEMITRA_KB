@@ -237,11 +237,13 @@ export default function NoteDetailPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(downloadUrl, {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          'Accept': 'application/pdf, application/json'
+          'Accept': 'application/pdf, application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         }
       });
       
