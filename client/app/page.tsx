@@ -214,7 +214,7 @@ export default function HomePage() {
               Contact Us
             </h2>
             <p className="text-lg md:text-xl text-gray-600">
-              Have questions? We're here to help!
+              Have questions? We&apos;re here to help!
             </p>
           </div>
           

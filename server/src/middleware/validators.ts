@@ -90,7 +90,7 @@ export const validateNoteQuery: ValidationChain[] = [
   query('uploaderRole').optional().isIn(['student', 'teacher']),
   query('sortBy')
     .optional()
-    .isIn(['uploadDate', 'upvotes', 'downloads', 'views'])
+    .isIn(['uploadDate', 'createdAt', 'upvotes', 'downloads', 'views'])
     .withMessage('Invalid sort field'),
   query('sortOrder').optional().isIn(['asc', 'desc']),
   query('page').optional().isInt({ min: 1 }).withMessage('Page must be >= 1'),

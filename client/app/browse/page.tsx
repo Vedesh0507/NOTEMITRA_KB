@@ -30,9 +30,10 @@ export default function BrowsePage() {
   const router = useRouter();
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  
+
   // Filter states
   const [selectedSubject, setSelectedSubject] = useState('');
   const [selectedSemester, setSelectedSemester] = useState('');
@@ -66,13 +67,20 @@ export default function BrowsePage() {
     fetchNotes();
   }, []);
 
-  const fetchNotes = async () => {
+  const fetchNotes = async (retryCount = 0) => {
     try {
       setLoading(true);
+      setFetchError('');
       const response = await notesAPI.getNotes();
       setNotes(response.data.notes || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch notes:', error);
+      // Retry up to 2 times on transient failures
+      if (retryCount < 2) {
+        setTimeout(() => fetchNotes(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+      setFetchError('Failed to load notes. Please try again.');
       setNotes([]);
     } finally {
       setLoading(false);
@@ -81,9 +89,9 @@ export default function BrowsePage() {
 
   const filteredNotes = notes
     .filter(note => {
-      const matchesSearch = searchQuery === '' || 
+      const matchesSearch = searchQuery === '' ||
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (note.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.subject.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesSubject = selectedSubject === '' || note.subject === selectedSubject;
@@ -262,6 +270,16 @@ export default function BrowsePage() {
             Showing {filteredNotes.length} {filteredNotes.length === 1 ? 'note' : 'notes'}
           </p>
         </div>
+
+        {/* Error Banner */}
+        {fetchError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 flex items-center justify-between">
+            <span className="text-sm">{fetchError}</span>
+            <Button variant="outline" size="sm" onClick={() => fetchNotes()}>
+              Retry
+            </Button>
+          </div>
+        )}
 
         {/* Notes Grid */}
         {loading ? (

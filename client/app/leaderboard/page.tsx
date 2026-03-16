@@ -21,12 +21,18 @@ export default function LeaderboardPage() {
     fetchLeaderboard();
   }, []);
 
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = async (retryCount = 0) => {
     try {
       setLoading(true);
+      setError('');
       const response = await leaderboardAPI.getLeaderboard();
-      setLeaderboard(response.data.leaderboard);
+      setLeaderboard(response.data.leaderboard || []);
     } catch (err: any) {
+      console.error('Failed to fetch leaderboard:', err);
+      if (retryCount < 2) {
+        setTimeout(() => fetchLeaderboard(retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
       setError(err.response?.data?.message || 'Failed to load leaderboard');
     } finally {
       setLoading(false);
@@ -108,8 +114,14 @@ export default function LeaderboardPage() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm sm:text-base">
-            {error}
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6 text-sm sm:text-base flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={() => fetchLeaderboard()}
+              className="ml-4 px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-sm font-medium transition"
+            >
+              Retry
+            </button>
           </div>
         )}
 

@@ -15,7 +15,8 @@ interface Note {
   semester: string;
   module: string;
   branch: string;
-  userName: string;
+  userName?: string;
+  uploaderName?: string;
   views: number;
   downloads: number;
   upvotes: number;
@@ -170,7 +171,7 @@ export default function NotesManagement() {
                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                           {note.branch}
                         </span>
-                        <span>By: {note.uploaderName}</span>
+                        <span>By: {note.uploaderName || note.userName}</span>
                         <span className="flex items-center">
                           <Eye className="w-4 h-4 mr-1" />
                           {note.views}

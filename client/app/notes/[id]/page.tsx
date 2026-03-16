@@ -237,11 +237,13 @@ export default function NoteDetailPage() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const response = await fetch(downloadUrl, {
         method: 'GET',
         signal: controller.signal,
         headers: {
-          'Accept': 'application/pdf, application/json'
+          'Accept': 'application/pdf, application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         }
       });
       
@@ -622,7 +624,7 @@ export default function NoteDetailPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Note not found</h2>
-          <p className="text-gray-600 mb-4">The note you're looking for doesn't exist.</p>
+          <p className="text-gray-600 mb-4">The note you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push('/browse')}>Browse Notes</Button>
         </div>
       </div>

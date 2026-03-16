@@ -40,7 +40,7 @@ router.get('/', optionalAuthenticate, validateNoteQuery, getNotes);
 router.get('/saved/list', authenticate, getSavedNotes);
 
 // Get single note
-router.get('/:id', validateMongoId, getNoteById);
+router.get('/:id', optionalAuthenticate, validateMongoId, getNoteById);
 
 // Get download URL (GET) - authenticated only
 router.get('/:id/download', authenticate, validateMongoId, getDownloadUrl);

@@ -144,8 +144,8 @@ export const deleteUser = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    // Delete user's notes
-    await Note.deleteMany({ uploaderId: id });
+    // Delete user's notes (handle both field name variants)
+    await Note.deleteMany({ $or: [{ uploaderId: id }, { userId: id }] });
 
     // Delete the user
     await User.deleteOne({ _id: id });
@@ -181,7 +181,8 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
         semester: n.semester,
         module: n.module,
         branch: n.branch,
-        userName: n.uploaderName,
+        uploaderName: n.uploaderName || (n as any).userName,
+        userName: n.uploaderName || (n as any).userName,
         views: n.views,
         downloads: n.downloads,
         upvotes: n.upvotes,
@@ -218,8 +219,11 @@ export const adminDeleteNote = async (req: Request, res: Response): Promise<void
     // Delete the note
     await Note.deleteOne({ _id: id });
 
-    // Update uploader's count
-    await User.findByIdAndUpdate(note.uploaderId, { $inc: { uploadsCount: -1 } });
+    // Update uploader's count (handle both field name variants)
+    const noteOwnerId = note.uploaderId || (note as any).userId;
+    if (noteOwnerId) {
+      await User.findByIdAndUpdate(noteOwnerId, { $inc: { uploadsCount: -1 } });
+    }
 
     res.json({ message: 'Note deleted successfully' });
   } catch (error: any) {
@@ -250,7 +254,7 @@ export const getReports = async (req: Request, res: Response): Promise<void> => 
           subject: note.subject,
           semester: note.semester,
           branch: note.branch,
-          userName: note.uploaderName,
+          userName: note.uploaderName || note.userName,
           reportReason: r.reason,
           createdAt: note.uploadDate,
         };
