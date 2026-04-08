@@ -69,7 +69,7 @@ export default function SignInPage() {
 
   const handleGoogleSignIn = () => {
     // Redirect to backend Google OAuth endpoint
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://notemitra-kb.onrender.com/api';
     const backendUrl = apiUrl.replace('/api', '');
     window.location.href = `${backendUrl}/api/auth/google`;
   };

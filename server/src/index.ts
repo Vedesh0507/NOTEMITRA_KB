@@ -35,7 +35,7 @@ const httpServer = createServer(app);
 // Initialize Socket.IO
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: process.env.FRONTEND_URL || 'https://notemitra-mic.vercel.app',
     credentials: true
   }
 });
@@ -51,7 +51,8 @@ app.use(
       // Allow requests with no origin (curl, mobile apps, etc.)
       if (!origin) return callback(null, true);
       const allowed = [
-        process.env.FRONTEND_URL || 'http://localhost:3000',
+        process.env.FRONTEND_URL || 'https://notemitra-mic.vercel.app',
+        'https://notemitra-mic.vercel.app',
         'http://localhost:3000',
         'http://localhost:3001'
       ];

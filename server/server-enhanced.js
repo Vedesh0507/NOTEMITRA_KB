@@ -297,7 +297,7 @@ passport.deserializeUser(async (id, done) => {
 const configureGoogleAuth = () => {
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-  const callbackURL = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback';
+  const callbackURL = process.env.GOOGLE_CALLBACK_URL || 'https://notemitra-kb.onrender.com/api/auth/google/callback';
 
   if (!clientID || !clientSecret || clientID.includes('your_') || clientSecret.includes('your_')) {
     console.log('⚠️  Google OAuth not configured');
@@ -928,7 +928,7 @@ app.get('/api/auth/google', (req, res, next) => {
               <li>Create OAuth 2.0 credentials:
                 <ul>
                   <li>Type: Web application</li>
-                  <li>Redirect URI: <code>http://localhost:5000/api/auth/google/callback</code></li>
+                  <li>Redirect URI: <code>https://notemitra-kb.onrender.com/api/auth/google/callback</code></li>
                 </ul>
               </li>
               <li>Copy your Client ID and Client Secret</li>
@@ -942,7 +942,7 @@ GOOGLE_CLIENT_SECRET=your_client_secret_here</pre>
           
           <p><strong>Detailed guide:</strong> Check <code>GOOGLE_OAUTH_SETUP.md</code> in your project folder.</p>
           
-          <p><a href="http://localhost:3000/auth/signin">← Back to Sign In</a></p>
+          <p><a href="https://notemitra-mic.vercel.app/auth/signin">← Back to Sign In</a></p>
         </body>
       </html>
     `);
@@ -952,10 +952,10 @@ GOOGLE_CLIENT_SECRET=your_client_secret_here</pre>
 
 app.get('/api/auth/google/callback', (req, res, next) => {
   if (!googleAuthEnabled) {
-    return res.redirect('http://localhost:3000/auth/signin?error=google_not_configured');
+    return res.redirect('https://notemitra-mic.vercel.app/auth/signin?error=google_not_configured');
   }
   passport.authenticate('google', { 
-    failureRedirect: `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/signin?error=google_auth_failed` 
+    failureRedirect: `${process.env.CLIENT_URL || 'https://notemitra-mic.vercel.app'}/auth/signin?error=google_auth_failed` 
   })(req, res, next);
 }, (req, res) => {
   // Successful authentication
@@ -965,11 +965,11 @@ app.get('/api/auth/google/callback', (req, res, next) => {
   // Check if new user needs to complete profile
   if (user.isNewUser || !user.branch || !user.rollNo) {
     // Redirect to profile completion page
-    const redirectURL = `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/google-callback?token=${token}&newUser=true&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}`;
+    const redirectURL = `${process.env.CLIENT_URL || 'https://notemitra-mic.vercel.app'}/auth/google-callback?token=${token}&newUser=true&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}`;
     res.redirect(redirectURL);
   } else {
     // Existing user with complete profile - redirect to browse
-    const redirectURL = `${process.env.CLIENT_URL || 'http://localhost:3000'}/auth/google-callback?token=${token}&newUser=false`;
+    const redirectURL = `${process.env.CLIENT_URL || 'https://notemitra-mic.vercel.app'}/auth/google-callback?token=${token}&newUser=false`;
     res.redirect(redirectURL);
   }
 });

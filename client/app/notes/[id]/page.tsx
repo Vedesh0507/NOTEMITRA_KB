@@ -223,7 +223,7 @@ export default function NoteDetailPage() {
       console.log('✅ Using note ID:', noteIdString);
       
       // Use API base URL which already includes /api
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://notemitra-kb.onrender.com/api';
       const downloadUrl = `${apiBase}/notes/${noteIdString}/download`;
       
       console.log('📡 Fetching from:', downloadUrl);
