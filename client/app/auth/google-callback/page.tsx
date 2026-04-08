@@ -66,7 +66,7 @@ export default function GoogleCallbackPage() {
 
     try {
       // Update user profile with additional details
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://notemitra-kb.onrender.com/api';
       await axios.post(
         `${apiUrl}/auth/update-google-user`,
         {
